@@ -85,6 +85,7 @@ def collect_transcript_pairs(root: Path) -> list[dict]:
             logger.warning(f"Could not read {f}: {e}")
             continue
         client = data.get("client", f.stem)
+        source_folder = data.get("source_folder", f.stem)
         meeting_date = data.get("meeting_date", "")
         for i, qa in enumerate(data.get("qa_groups", [])):
             question = qa.get("question", "").strip()
@@ -92,13 +93,14 @@ def collect_transcript_pairs(root: Path) -> list[dict]:
             if not question or not answer:
                 continue
             pairs.append({
-                "chunk_id": f"transcript_qa_{client}_{i}",
-                "point_id": stable_id("transcript", client, i),
+                "chunk_id": f"transcript_qa_{source_folder}_{i}",
+                "point_id": stable_id("transcript", source_folder, i),
                 "text": question,
                 "answer": answer,
                 "tags": qa.get("tags", []),
                 "reasoning": qa.get("reasoning", ""),
                 "document_name": client,
+                "source_folder": source_folder,
                 "meeting_date": meeting_date,
                 "source": "transcript",
                 "doc_type": "qa_pair",
