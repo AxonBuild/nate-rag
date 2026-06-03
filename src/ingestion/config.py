@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_base_url: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
+    openai_refinement_model: Optional[str] = None
     openai_embedding_model: str = "text-embedding-3-large"
 
     @computed_field

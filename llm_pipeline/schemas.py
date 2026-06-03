@@ -6,18 +6,21 @@ class QAGroup(BaseModel):
     client_message_indices: list[int]
     advisor_message_indices: list[int]
     tags: list[str]
+    reasoning: str
+    answer: str
 
 
 class ExtractionResult(BaseModel):
     qa_groups: list[QAGroup]
-    skipped_indices: list[int]
+    skipped_indices: list[int] = []
 
 
 class QAGroupFull(BaseModel):
     question: str
     tags: list[str]
-    client_messages: list[str]
-    advisor_messages: list[str]
+    reasoning: str
+    answer: str
+    advisor_message_indices: list[int]
 
 
 class ProcessedChat(BaseModel):

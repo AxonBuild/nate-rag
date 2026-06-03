@@ -20,6 +20,7 @@ class LLMClient:
             kwargs["base_url"] = settings.openai_base_url
         self.client = AsyncOpenAI(**kwargs)
         self.model = settings.openai_model
+        self.refinement_model = settings.openai_refinement_model or settings.openai_model
 
     async def refine_query(
         self,
@@ -39,7 +40,7 @@ class LLMClient:
         )
 
         response = await self.client.chat.completions.create(
-            model=self.model,
+            model=self.refinement_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             max_tokens=400,

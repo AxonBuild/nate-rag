@@ -1,9 +1,18 @@
 import json
 import os
+from dataclasses import dataclass
 
 from openai import OpenAI
 
 from llm_pipeline.schemas import ExtractionResult
+
+
+@dataclass
+class ExtractionResponse:
+    result: ExtractionResult
+    input_tokens: int
+    output_tokens: int
+    cost: float
 
 
 def _make_client() -> OpenAI:
@@ -16,8 +25,8 @@ def _make_client() -> OpenAI:
 def extract_qa_groups(
     system_prompt: str,
     user_message: str,
-    model: str = "openai/gpt-4o-mini",
-) -> ExtractionResult:
+    model: str = "openai/gpt-5.1",
+) -> ExtractionResponse:
     client = _make_client()
 
     response = client.chat.completions.create(
@@ -32,4 +41,13 @@ def extract_qa_groups(
 
     raw = response.choices[0].message.content
     data = json.loads(raw)
-    return ExtractionResult.model_validate(data)
+    result = ExtractionResult.model_validate(data)
+
+    usage = response.usage
+    cost = usage.model_extra.get("cost", 0.0) if usage and usage.model_extra else 0.0
+    return ExtractionResponse(
+        result=result,
+        input_tokens=usage.prompt_tokens if usage else 0,
+        output_tokens=usage.completion_tokens if usage else 0,
+        cost=cost,
+    )
