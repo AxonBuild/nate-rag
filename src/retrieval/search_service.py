@@ -222,26 +222,58 @@ class SearchService:
     async def _search_qa(
         self,
         query_vector: list[float],
+        keywords: list[str],
         limit: int,
         score_threshold: Optional[float],
         topic_tags: Optional[list[str]] = None,
     ) -> list[dict[str, Any]]:
-        """Flat vector search over QA pairs."""
+        """3-way RRF fusion over QA pairs: question dense + answer dense + answer BM25 sparse."""
         must = [FieldCondition(key="file_type", match=MatchValue(value="qa_pair"))]
         if topic_tags:
             must.append(FieldCondition(key="tags", match=MatchAny(any=topic_tags)))
+        q_filter = Filter(must=must)
 
-        results = await asyncio.to_thread(
-            self.qdrant.client.query_points,
-            collection_name=self.qdrant.collection_name,
-            query=query_vector,
-            using="content",
-            query_filter=Filter(must=must),
-            limit=limit,
-            score_threshold=score_threshold,
-            with_payload=True,
-        )
-        return _format_hits(results.points)
+        prefetch_list = [
+            Prefetch(query=query_vector, using="content",        limit=limit * 2, filter=q_filter),
+            Prefetch(query=query_vector, using="answer_content", limit=limit * 2, filter=q_filter),
+        ]
+
+        # Add sparse prefetch over answer text if keywords are available
+        if keywords and settings.use_keyword_search_level2:
+            kw_text = " ".join(k.strip() for k in keywords if k.strip())
+            sv = await self.qdrant._generate_sparse_vector(kw_text)
+            if sv:
+                prefetch_list.append(Prefetch(
+                    query=SparseVector(indices=sv["indices"], values=sv["values"]),
+                    using="answer_content_sparse",
+                    limit=limit * 2,
+                    filter=q_filter,
+                ))
+
+        try:
+            results = await asyncio.to_thread(
+                self.qdrant.client.query_points,
+                collection_name=self.qdrant.collection_name,
+                prefetch=prefetch_list,
+                query=FusionQuery(fusion=Fusion.RRF),
+                limit=limit,
+                score_threshold=score_threshold,
+                with_payload=True,
+            )
+            return _format_hits(results.points)
+        except Exception as e:
+            logger.warning(f"QA RRF fusion failed, falling back to question-only search: {e}")
+            results = await asyncio.to_thread(
+                self.qdrant.client.query_points,
+                collection_name=self.qdrant.collection_name,
+                query=query_vector,
+                using="content",
+                query_filter=q_filter,
+                limit=limit,
+                score_threshold=score_threshold,
+                with_payload=True,
+            )
+            return _format_hits(results.points)
 
     # ------------------------------------------------------------------
     # Public API
@@ -297,6 +329,7 @@ class SearchService:
             ),
             self._search_qa(
                 query_vector=query_vector,
+                keywords=keywords,
                 limit=5,
                 score_threshold=score_threshold,
             ),

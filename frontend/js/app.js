@@ -38,22 +38,7 @@
 
   function renderMarkdown(text) {
     if (!text) return '';
-    let s = String(text);
-    // Bold
-    s = s.replace(/\*\*([\s\S]*?)\*\*/g, '\x01$1\x02');
-    // Italic
-    s = s.replace(/\*([\s\S]*?)\*/g, '\x03$1\x04');
-    // Numbered lists: lines starting with "1. " etc
-    s = s.replace(/^(\d+)\.\s+/gm, '\x05$1. ');
-    // Bullet lists
-    s = s.replace(/^[-*]\s+/gm, '\x06');
-    s = escapeHtml(s);
-    s = s.replace(/\x01([\s\S]*?)\x02/g, '<strong>$1</strong>');
-    s = s.replace(/\x03([\s\S]*?)\x04/g, '<em>$1</em>');
-    s = s.replace(/\x05(\d+)\. /g, '<br><b>$1.</b> ');
-    s = s.replace(/\x06/g, '<br>• ');
-    s = s.replace(/\n/g, '<br>');
-    return s;
+    return marked.parse(String(text));
   }
 
   function highlightText(text, keywords) {
