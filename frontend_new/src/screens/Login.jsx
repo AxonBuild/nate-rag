@@ -90,7 +90,7 @@ export default function Login({ theme, toggleTheme }) {
         <h1>{isInvite ? 'Accept your invitation' : 'Welcome to Nate\u2019s AI'}</h1>
         <p className="login-tag">
           {isInvite
-            ? 'Enter your name and password to join Meeker CPA\u2019s Nate\u2019s AI workspace.'
+            ? 'Enter your name and password to finish setting up your account.'
             : 'Your AI-powered tax & real estate advisor'}
         </p>
 
@@ -103,13 +103,13 @@ export default function Login({ theme, toggleTheme }) {
         </div>
 
         <div className="login-foot">
-          Access is by invitation only. <a href="mailto:support@meekercpa.com">Request access</a>
+          Access is by invitation only. Contact your administrator if you need an invite.
         </div>
       </div>
 
       <div className="clerk-note">
         <Check size={13} style={{ color: 'var(--accent)' }} />
-        Secured by Clerk · Meeker CPA, PLLC
+        Secured by Clerk
       </div>
     </div>
   );

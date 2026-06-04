@@ -7,7 +7,6 @@ export default defineConfig({
     proxy: {
       '/chat': 'http://localhost:8000',
       '/search': 'http://localhost:8000',
-      '/stats': 'http://localhost:8000',
       '/config': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
       '/admin': 'http://localhost:8000',

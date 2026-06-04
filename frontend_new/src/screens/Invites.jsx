@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Mail, UserPlus, RefreshCw } from 'lucide-react';
 import { api } from '../api/client.js';
+import { toUserFacingMessage } from '../utils/userFacingError.js';
+
+function displayRole(role) {
+  if (role === 'admin') return 'Admin';
+  return 'Member';
+}
 
 export default function Invites() {
   const [email, setEmail] = useState('');
@@ -17,7 +23,7 @@ export default function Invites() {
       const data = await api.listInvitations();
       setList(data.invitations || []);
     } catch (err) {
-      setError(err.message);
+      setError(toUserFacingMessage(err, 'invites'));
     } finally {
       setLoadingList(false);
     }
@@ -38,7 +44,7 @@ export default function Invites() {
       setEmail('');
       loadInvites();
     } catch (err) {
-      setError(err.message);
+      setError(toUserFacingMessage(err, 'invites'));
     } finally {
       setSending(false);
     }
@@ -47,9 +53,9 @@ export default function Invites() {
   return (
     <div className="page-scroll scroll">
       <div className="page-inner fade-in">
-        <h1 className="page-h">Invite users</h1>
+        <h1 className="page-h">Invitations</h1>
         <p className="page-sub">
-          Send email invitations via Clerk. New users sign up with the role you choose below.
+          Send email invitations via Clerk. Recipients sign up with the access level you choose below.
         </p>
 
         <div className="panel invite-form-panel">
@@ -61,14 +67,14 @@ export default function Invites() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="client@example.com"
+                placeholder="name@example.com"
                 required
               />
             </div>
             <div className="invite-field">
               <label htmlFor="invite-role">Role</label>
               <select id="invite-role" className="invite-select" value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="client">Client (normal user)</option>
+                <option value="client">Member</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -98,7 +104,7 @@ export default function Invites() {
               <li key={inv.id} className="invite-row">
                 <Mail size={15} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
                 <span className="invite-email">{inv.email_address}</span>
-                <span className="pill doc">{inv.role || 'client'}</span>
+                <span className="pill doc">{displayRole(inv.role || 'client')}</span>
                 <span className="mono faint" style={{ fontSize: 11 }}>{inv.status}</span>
               </li>
             ))}

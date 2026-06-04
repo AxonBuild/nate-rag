@@ -10,16 +10,9 @@ import { chatStream } from '../api/chatStream.js';
 import ChatStatusPipeline from '../components/ChatStatusPipeline.jsx';
 import { useAnswerReveal } from '../hooks/useAnswerReveal.js';
 import { requestSettingsPayload } from '../utils/settings.js';
+import { toUserFacingMessage } from '../utils/userFacingError.js';
 
 const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-function formatStreamError(err) {
-  const raw = err?.message || 'Unknown error';
-  if (/timeout|timed out/i.test(raw)) {
-    return 'This request timed out. Complex questions can take a while — tap Retry to try again.';
-  }
-  return `Something went wrong: ${raw}`;
-}
 
 function verificationLabel(verification) {
   if (!verification) return null;
@@ -162,8 +155,8 @@ function Empty({ userName, onPick }) {
       <div className="glyph"><Sparkles size={28} style={{ color: 'var(--accent)' }} /></div>
       <h2>How can I help, {first}?</h2>
       <p>
-        Ask anything about tax strategy, real-estate rules, or deductions. I&apos;ll answer from
-        Meeker CPA&apos;s proprietary playbooks, scripts, and client transcripts — with sources.
+        Ask anything about tax strategy, real-estate rules, or deductions. Answers are grounded in
+        the knowledge base and include sources when available.
       </p>
       <div className="suggest-grid">
         {SUGGESTIONS.map((s, i) => {
@@ -227,7 +220,7 @@ function Composer({ onSend, busy }) {
             <span className="kbd">Enter</span> to send · <span className="kbd">Shift+Enter</span> new line
           </span>
           <span className="faint">
-            {busy ? 'Nate\'s AI is working on your answer…' : 'Answers cite firm sources'}
+            {busy ? 'Nate\'s AI is working on your answer…' : 'Answers cite knowledge base sources'}
           </span>
         </div>
       </div>
@@ -343,13 +336,15 @@ export default function Chat({
           patchAi(aiId, { status: phase, retryHint: undefined, answer: '' });
         },
         onDone: (data) => {
-          if (data.conversation_id) onConversationId?.(data.conversation_id);
+          if (data.conversation_id) {
+            onConversationId?.(data.conversation_id, { isNew: !conversationId });
+          }
           revealAnswer(aiId, data);
         },
       });
     } catch (err) {
       patchAi(aiId, {
-        answer: formatStreamError(err),
+        answer: toUserFacingMessage(err, 'chat'),
         error: true,
         streaming: false,
         status: null,

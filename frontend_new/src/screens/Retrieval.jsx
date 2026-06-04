@@ -75,7 +75,7 @@ export default function Retrieval({ settings, setSettings }) {
             <div className="settings-field" style={{ marginTop: 12 }}>
               <div className="field-label">Chunks ({RETRIEVAL_MIN}–{RETRIEVAL_MAX})</div>
               <input
-                className="sb-input"
+                className="settings-input"
                 type="number"
                 min={RETRIEVAL_MIN}
                 max={RETRIEVAL_MAX}

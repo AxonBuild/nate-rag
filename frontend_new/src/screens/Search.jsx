@@ -5,6 +5,7 @@ import { SourceList } from '../components/SourceCard.jsx';
 import Performance from '../components/Performance.jsx';
 import { api } from '../api/client.js';
 import { requestSettingsPayload } from '../utils/settings.js';
+import { toUserFacingMessage } from '../utils/userFacingError.js';
 
 export default function Search({ settings }) {
   const [q, setQ] = useState('');
@@ -28,7 +29,7 @@ export default function Search({ settings }) {
         timing: data.timing,
       });
     } catch (err) {
-      setError(err.message);
+      setError(toUserFacingMessage(err, 'search'));
     } finally {
       setBusy(false);
     }
@@ -40,7 +41,7 @@ export default function Search({ settings }) {
       <div className="page-inner fade-in">
         <h1 className="page-h">Search the knowledge base</h1>
         <p className="page-sub">
-          Semantic search across guides, scripts, SEO content, and client Q&amp;A.
+          Semantic search across guides, scripts, SEO content, and Q&amp;A transcripts.
         </p>
 
         <div className="search-bar">

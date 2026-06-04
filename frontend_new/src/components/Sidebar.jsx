@@ -1,7 +1,6 @@
 import {
   MessageSquare,
   Search,
-  BarChart2,
   UserPlus,
   PanelLeft,
   LogOut,
@@ -46,15 +45,10 @@ export default function Sidebar({
     { id: 'search', icon: Search, label: 'Search' },
     { id: 'retrieval', icon: SlidersHorizontal, label: 'Retrieval' },
     { id: 'prompt', icon: FileText, label: 'System prompt' },
-    ...(isAdmin
-      ? [
-          { id: 'stats', icon: BarChart2, label: 'Statistics' },
-          { id: 'invites', icon: UserPlus, label: 'Invites' },
-        ]
-      : []),
+    ...(isAdmin ? [{ id: 'invites', icon: UserPlus, label: 'Invitations' }] : []),
   ];
 
-  const roleLabel = isAdmin ? 'Admin · Meeker CPA' : 'Client · Meeker CPA';
+  const roleLabel = isAdmin ? 'Admin' : null;
 
   const initials = user?.name
     ? user.name
@@ -159,8 +153,8 @@ export default function Sidebar({
         {!collapsed && (
           <>
             <div className="sb-user-meta hide-collapsed">
-              <div className="nm">{user?.name || 'User'}</div>
-              <div className="rl">{roleLabel}</div>
+              <div className="nm">{user?.name || user?.email || 'Account'}</div>
+              {roleLabel ? <div className="rl">{roleLabel}</div> : null}
             </div>
             <button className="sb-logout hide-collapsed" title="Log out" onClick={onLogout}>
               <LogOut size={17} />

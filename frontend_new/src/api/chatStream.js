@@ -1,3 +1,5 @@
+import { isRetryableError, normalizeFetchError, toUserFacingMessage } from '../utils/userFacingError.js';
+
 const BASE = import.meta.env.VITE_API_URL || '';
 
 const DEFAULT_MAX_RETRIES = 2;
@@ -25,20 +27,7 @@ export function statusLabel(phase) {
   return STATUS_LABELS[phase] || 'Working…';
 }
 
-/** Errors worth an automatic retry (timeouts, gateway, network). */
-export function isRetryableError(err) {
-  if (!err) return false;
-  const msg = String(err.message || err).toLowerCase();
-  if (
-    /timeout|timed out|network|failed to fetch|econnreset|connection reset|aborted|502|503|504|429/.test(
-      msg
-    )
-  ) {
-    return true;
-  }
-  if (err.status && [502, 503, 504, 429].includes(err.status)) return true;
-  return err.name === 'TypeError';
-}
+export { isRetryableError };
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,7 +48,7 @@ async function chatStreamOnce(body, { onStatus, onToken, onDone, onError } = {})
       body: JSON.stringify(body),
     });
   } catch (err) {
-    throw new Error(err.message || 'Network error');
+    throw normalizeFetchError(err);
   }
 
   if (!res.ok) {
@@ -99,7 +88,8 @@ async function chatStreamOnce(body, { onStatus, onToken, onDone, onError } = {})
     else if (event === 'token') onToken?.(data.text ?? '');
     else if (event === 'done') onDone?.(data);
     else if (event === 'error') {
-      streamError = new Error(data.message || 'Stream failed');
+      const raw = data.message || 'Stream failed';
+      streamError = new Error(toUserFacingMessage({ message: raw }, 'chat'));
       onError?.(streamError);
     }
   };

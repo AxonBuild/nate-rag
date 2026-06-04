@@ -4,7 +4,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import Login from './screens/Login.jsx';
 import Chat from './screens/Chat.jsx';
 import Search from './screens/Search.jsx';
-import Stats from './screens/Stats.jsx';
 import Invites from './screens/Invites.jsx';
 import Retrieval from './screens/Retrieval.jsx';
 import SystemPrompt from './screens/SystemPrompt.jsx';
@@ -24,12 +23,11 @@ const TITLES = {
   search: { title: 'Search', crumb: 'Knowledge Base' },
   retrieval: { title: 'Retrieval', crumb: 'Settings' },
   prompt: { title: 'System prompt', crumb: 'Settings' },
-  stats: { title: 'Statistics', crumb: 'System' },
-  invites: { title: 'Invite users', crumb: 'Admin' },
+  invites: { title: 'Invitations', crumb: 'Admin' },
 };
 
 function clerkDisplayUser(user) {
-  if (!user) return { name: 'User', email: '' };
+  if (!user) return { name: '', email: '' };
   const name =
     user.fullName ||
     [user.firstName, user.lastName].filter(Boolean).join(' ') ||
@@ -134,6 +132,25 @@ function AppShell({ user, onLogout, isAdmin }) {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getSystemPrompt();
+        if (cancelled) return;
+        setSettings((prev) => ({
+          ...prev,
+          systemPrompt: data.is_custom ? data.effective_prompt : '',
+        }));
+      } catch (e) {
+        console.error('Failed to load system prompt', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const startNewChat = () => {
     setView('chat');
     setActiveConversationId(null);
@@ -156,9 +173,24 @@ function AppShell({ user, onLogout, isAdmin }) {
     }
   };
 
-  const handleConversationId = (id) => {
-    if (id) setActiveConversationId(id);
-    refreshConversations();
+  const bumpConversationToTop = (id) => {
+    setConversations((list) => {
+      const idx = list.findIndex((c) => c.id === id);
+      if (idx <= 0) return list;
+      const next = [...list];
+      const [item] = next.splice(idx, 1);
+      return [item, ...next];
+    });
+  };
+
+  const handleConversationId = (id, { isNew = false } = {}) => {
+    if (!id) return;
+    setActiveConversationId(id);
+    if (isNew) {
+      refreshConversations();
+    } else {
+      bumpConversationToTop(id);
+    }
   };
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
@@ -183,7 +215,7 @@ function AppShell({ user, onLogout, isAdmin }) {
         setMessages([]);
         setBusy(false);
       }
-      await refreshConversations();
+      setConversations((list) => list.filter((c) => c.id !== id));
       return true;
     } catch (e) {
       console.error('Failed to delete conversation', e);
@@ -209,7 +241,7 @@ function AppShell({ user, onLogout, isAdmin }) {
   };
 
   useEffect(() => {
-    if (!isAdmin && (view === 'stats' || view === 'invites')) setView('chat');
+    if (!isAdmin && view === 'invites') setView('chat');
   }, [isAdmin, view]);
 
   let screen;
@@ -231,11 +263,9 @@ function AppShell({ user, onLogout, isAdmin }) {
   } else if (view === 'retrieval') {
     screen = <Retrieval settings={settings} setSettings={setSettings} />;
   } else if (view === 'prompt') {
-    screen = <SystemPrompt settings={settings} setSettings={setSettings} />;
+    screen = <SystemPrompt setSettings={setSettings} />;
   } else if (view === 'invites' && isAdmin) {
     screen = <Invites />;
-  } else if (view === 'stats' && isAdmin) {
-    screen = <Stats />;
   } else {
     screen = null;
   }

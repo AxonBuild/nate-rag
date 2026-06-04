@@ -1,3 +1,5 @@
+import { normalizeFetchError } from '../utils/userFacingError.js';
+
 const BASE = import.meta.env.VITE_API_URL || '';
 
 let getAuthToken = null;
@@ -14,14 +16,21 @@ async function request(path, options = {}) {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(BASE + path, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(BASE + path, { ...options, headers });
+  } catch (err) {
+    throw normalizeFetchError(err);
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const d = err.detail;
     const msg = Array.isArray(d)
       ? d.map((x) => x.msg || x.message || String(x)).join(', ')
       : (typeof d === 'string' ? d : d?.message) || res.statusText;
-    throw new Error(msg || `HTTP ${res.status}`);
+    const e = new Error(msg || `HTTP ${res.status}`);
+    e.status = res.status;
+    throw e;
   }
   return res.json();
 }
@@ -35,7 +44,6 @@ const json = (body) => ({
 export const api = {
   chat:   (body) => request('/chat/',   json(body)),
   search: (body) => request('/search/', json(body)),
-  stats:  ()     => request('/stats/'),
   config: ()     => request('/config/'),
   inviteUser: (body) => request('/admin/invitations', json(body)),
   listInvitations: () => request('/admin/invitations'),
@@ -45,4 +53,11 @@ export const api = {
   getConversation: (id) => request(`/conversations/${id}`),
   deleteConversation: (id) =>
     request(`/conversations/${id}`, { method: 'DELETE' }),
+  getSystemPrompt: () => request('/settings/system-prompt'),
+  saveSystemPrompt: (body) =>
+    request('/settings/system-prompt', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
 };
