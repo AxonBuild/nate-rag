@@ -106,11 +106,10 @@ function AppShell({ user, onLogout, isAdmin }) {
         filters={filters}
         advanced={advanced}
         user={user}
-        isAdmin={isAdmin}
       />
     );
   } else if (view === 'search') {
-    screen = <Search filters={filters} isAdmin={isAdmin} />;
+    screen = <Search filters={filters} />;
   } else if (view === 'invites' && isAdmin) {
     screen = <Invites />;
   } else if (view === 'stats' && isAdmin) {

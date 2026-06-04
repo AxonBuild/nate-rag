@@ -6,10 +6,18 @@ import { SourceList } from '../components/SourceCard.jsx';
 import Performance from '../components/Performance.jsx';
 import Refinement from '../components/Refinement.jsx';
 import { SUGGESTIONS } from '../constants/suggestions.js';
-import { api } from '../api/client.js';
+import { chatStream, statusLabel } from '../api/chatStream.js';
 import { filterPayload } from '../utils/filters.js';
 
 const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+function formatStreamError(err) {
+  const raw = err?.message || 'Unknown error';
+  if (/timeout|timed out/i.test(raw)) {
+    return 'This request timed out. Complex questions can take a while — tap Retry to try again.';
+  }
+  return `Something went wrong: ${raw}`;
+}
 
 function CopyBtn({ text }) {
   const [copied, setCopied] = useState(false);
@@ -30,32 +38,9 @@ function CopyBtn({ text }) {
   );
 }
 
-function AiMessage({ msg, onRegenerate, isAdmin }) {
-  const [shown, setShown] = useState(msg.streaming ? '' : msg.answer);
-  const [done, setDone] = useState(!msg.streaming);
-
-  useEffect(() => {
-    if (!msg.streaming) {
-      setShown(msg.answer);
-      setDone(true);
-      return;
-    }
-    let i = 0;
-    const full = msg.answer || '';
-    let timer;
-    const step = () => {
-      i += Math.max(2, Math.round(full.length / 280));
-      setShown(full.slice(0, i));
-      if (i < full.length) timer = setTimeout(step, 14);
-      else { setShown(full); setDone(true); }
-    };
-    timer = setTimeout(step, 30);
-    return () => clearTimeout(timer);
-  }, [msg.id, msg.streaming, msg.answer]);
-
-  const search = msg.search || {};
-  const results = search.results || [];
-  const totalMs = msg.timing?.total_chat_ms;
+function AiMessage({ msg, onRegenerate, onRetry }) {
+  const streaming = Boolean(msg.streaming);
+  const showMetaStatus = streaming && msg.status && !msg.answer;
 
   return (
     <div className="msg ai msg-enter">
@@ -63,19 +48,35 @@ function AiMessage({ msg, onRegenerate, isAdmin }) {
       <div className="msg-body">
         <div className="msg-meta">
           <span className="who">Nate AI</span>
-          <span className="ts">{msg.ts}</span>
+          {showMetaStatus ? (
+            <span className="muted" style={{ fontSize: 12 }}>{statusLabel(msg.status)}</span>
+          ) : (
+            <span className="ts">{msg.ts}</span>
+          )}
         </div>
         {msg.error ? (
-          <div className="ai-content" style={{ color: '#e05a5a' }}>{msg.answer}</div>
-        ) : done ? (
-          <Markdown text={shown} />
-        ) : (
-          <div className="ai-content" style={{ whiteSpace: 'pre-wrap' }}>
-            {shown}
+          <>
+            <div className="ai-content" style={{ color: '#e05a5a' }}>{msg.answer}</div>
+            {onRetry && (
+              <div className="msg-actions">
+                <button type="button" className="icon-btn" title="Retry" onClick={onRetry}>
+                  <RefreshCw size={15} />
+                  Retry
+                </button>
+              </div>
+            )}
+          </>
+        ) : streaming && !msg.answer ? (
+          <div className="typing"><span /><span /><span /></div>
+        ) : streaming ? (
+          <div className="ai-content">
+            <Markdown text={msg.answer || ''} />
             <span className="cursor-blink" />
           </div>
+        ) : (
+          <Markdown text={msg.answer} />
         )}
-        {done && !msg.error && (
+        {!streaming && !msg.error && (
           <>
             <div className="msg-actions">
               <CopyBtn text={msg.answer} />
@@ -85,23 +86,27 @@ function AiMessage({ msg, onRegenerate, isAdmin }) {
                 </button>
               )}
             </div>
-            {msg.search && (
+            {(msg.search || msg.timing) && (
               <div style={{ marginTop: 14 }}>
-                {results.length > 0 && (
-                  <Disclosure icon={Layers} label="Sources" count={`${results.length} documents`}>
-                    <SourceList results={results} />
+                {msg.search && (msg.search.results || []).length > 0 && (
+                  <Disclosure icon={Layers} label="Sources" count={`${msg.search.results.length} documents`}>
+                    <SourceList results={msg.search.results} />
                   </Disclosure>
                 )}
-                {(search.refined_query || (search.keywords || []).length > 0) && (
+                {msg.search && (msg.search.refined_query || (msg.search.keywords || []).length > 0) && (
                   <Disclosure icon={Sparkles} label="Query refinement">
-                    <Refinement refined={search.refined_query} keywords={search.keywords} />
+                    <Refinement refined={msg.search.refined_query} keywords={msg.search.keywords} />
                   </Disclosure>
                 )}
-                {isAdmin && msg.timing && (
+                {msg.timing && (
                   <Disclosure
                     icon={Clock}
                     label="Performance"
-                    count={totalMs != null ? `${(totalMs / 1000).toFixed(2)}s` : undefined}
+                    count={
+                      msg.timing.total_chat_ms != null
+                        ? `${(msg.timing.total_chat_ms / 1000).toFixed(2)}s`
+                        : undefined
+                    }
                   >
                     <Performance timing={msg.timing} />
                   </Disclosure>
@@ -125,21 +130,6 @@ function UserMessage({ msg, initials }) {
           <span className="who">You</span>
         </div>
         <div className="user-bubble">{msg.text}</div>
-      </div>
-    </div>
-  );
-}
-
-function Typing() {
-  return (
-    <div className="msg ai msg-enter">
-      <div className="mavatar"><Sparkles size={18} /></div>
-      <div className="msg-body">
-        <div className="msg-meta">
-          <span className="who">Nate AI</span>
-          <span className="muted" style={{ fontSize: 12 }}>searching the knowledge base…</span>
-        </div>
-        <div className="typing"><span /><span /><span /></div>
       </div>
     </div>
   );
@@ -173,7 +163,7 @@ function Empty({ userName, onPick }) {
   );
 }
 
-function Composer({ onSend, busy }) {
+function Composer({ onSend, busy, statusHint }) {
   const [val, setVal] = useState('');
   const ref = useRef(null);
 
@@ -216,7 +206,9 @@ function Composer({ onSend, busy }) {
           <span>
             <span className="kbd">Enter</span> to send · <span className="kbd">Shift+Enter</span> new line
           </span>
-          <span className="faint">{busy ? 'Nate is responding…' : 'Answers cite firm sources'}</span>
+          <span className="faint">
+            {busy && statusHint ? statusHint : busy ? 'Nate is responding…' : 'Answers cite firm sources'}
+          </span>
         </div>
       </div>
     </div>
@@ -225,7 +217,7 @@ function Composer({ onSend, busy }) {
 
 function buildHistory(messages) {
   return messages
-    .filter((m) => !m.error)
+    .filter((m) => !m.error && !m.streaming)
     .map((m) =>
       m.role === 'user'
         ? { role: 'user', content: m.text }
@@ -234,9 +226,10 @@ function buildHistory(messages) {
     .slice(-10);
 }
 
-export default function Chat({ messages, setMessages, busy, setBusy, filters, advanced, user, isAdmin }) {
+export default function Chat({ messages, setMessages, busy, setBusy, filters, advanced, user }) {
   const threadRef = useRef(null);
   const lastUserRef = useRef('');
+  const [statusHint, setStatusHint] = useState('');
 
   const initials = user?.name
     ? user.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
@@ -247,65 +240,116 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
     if (el) el.scrollTop = el.scrollHeight;
   };
 
-  useEffect(() => { scrollDown(); }, [messages.length, busy]);
+  useEffect(() => { scrollDown(); }, [messages, busy]);
 
-  const send = async (text, { replaceLastAi = false } = {}) => {
+  const patchAi = (aiId, patch) => {
+    setMessages((m) => m.map((msg) => (msg.id === aiId ? { ...msg, ...patch } : msg)));
+  };
+
+  const send = async (text, { retryAiId } = {}) => {
     if (busy) return;
     lastUserRef.current = text;
 
-    if (!replaceLastAi) {
-      setMessages((m) => [...m, { id: `u${Date.now()}`, role: 'user', text, ts: now() }]);
+    const aiId = retryAiId || `a${Date.now()}`;
+    if (retryAiId) {
+      patchAi(retryAiId, {
+        answer: '',
+        error: false,
+        streaming: true,
+        status: 'refining',
+        search: undefined,
+        timing: undefined,
+        ts: now(),
+      });
+    } else {
+      setMessages((m) => [
+        ...m,
+        { id: `u${Date.now()}`, role: 'user', text, ts: now() },
+        {
+          id: aiId,
+          role: 'ai',
+          answer: '',
+          status: 'refining',
+          streaming: true,
+          ts: now(),
+        },
+      ]);
     }
 
     setBusy(true);
+    setStatusHint(statusLabel('refining'));
+
+    const historySource = retryAiId
+      ? messages.filter((m) => m.id !== retryAiId)
+      : messages;
+    const body = {
+      question: text,
+      chat_history: buildHistory(historySource),
+      ...filterPayload(filters),
+    };
+    const sys = advanced?.sys?.trim();
+    if (sys) body.system_prompt = sys;
+
     try {
-      const body = {
-        question: text,
-        chat_history: buildHistory(replaceLastAi ? messages.slice(0, -1) : messages),
-        ...filterPayload(filters),
-      };
-      const sys = advanced?.sys?.trim();
-      if (sys) body.system_prompt = sys;
-
-      const data = await api.chat(body);
-      const aMsg = {
-        id: `a${Date.now()}`,
-        role: 'ai',
-        answer: data.answer || '',
-        search: data.search,
-        timing: data.timing,
-        ts: now(),
-        streaming: true,
-      };
-
-      if (replaceLastAi) {
-        setMessages((m) => [...m.slice(0, -1), aMsg]);
-      } else {
-        setMessages((m) => [...m, aMsg]);
-      }
+      await chatStream(body, {
+        onRetry: (attempt, maxRetries) => {
+          patchAi(aiId, {
+            answer: '',
+            error: false,
+            streaming: true,
+            status: 'refining',
+            search: undefined,
+            timing: undefined,
+          });
+          setStatusHint(`Retrying (${attempt}/${maxRetries})…`);
+        },
+        onStatus: (phase) => {
+          patchAi(aiId, { status: phase });
+          setStatusHint(statusLabel(phase));
+        },
+        onToken: (chunk) => {
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === aiId
+                ? { ...msg, answer: (msg.answer || '') + chunk, status: 'generating', error: false }
+                : msg
+            )
+          );
+          setStatusHint(statusLabel('generating'));
+        },
+        onDone: (data) => {
+          patchAi(aiId, {
+            answer: data.answer || '',
+            search: data.search,
+            timing: data.timing,
+            streaming: false,
+            status: null,
+            error: false,
+          });
+        },
+      });
     } catch (err) {
-      const errMsg = {
-        id: `a${Date.now()}`,
-        role: 'ai',
-        answer: `Something went wrong: ${err.message}`,
+      patchAi(aiId, {
+        answer: formatStreamError(err),
         error: true,
-        ts: now(),
         streaming: false,
-      };
-      if (replaceLastAi) {
-        setMessages((m) => [...m.slice(0, -1), errMsg]);
-      } else {
-        setMessages((m) => [...m, errMsg]);
-      }
+        status: null,
+      });
     } finally {
       setBusy(false);
+      setStatusHint('');
     }
+  };
+
+  const retryFailed = (aiId) => {
+    if (!lastUserRef.current || busy) return;
+    send(lastUserRef.current, { retryAiId: aiId });
   };
 
   const regenerate = () => {
     if (!lastUserRef.current || busy) return;
     setMessages((m) => (m[m.length - 1]?.role === 'ai' ? m.slice(0, -1) : m));
-    send(lastUserRef.current, { replaceLastAi: false });
+    send(lastUserRef.current);
   };
 
   return (
@@ -322,16 +366,21 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
                 <AiMessage
                   key={m.id}
                   msg={m}
-                  isAdmin={isAdmin}
-                  onRegenerate={idx === messages.length - 1 && !busy ? regenerate : undefined}
+                  onRegenerate={
+                    idx === messages.length - 1 && !busy && !m.error ? regenerate : undefined
+                  }
+                  onRetry={
+                    m.error && idx === messages.length - 1 && !busy
+                      ? () => retryFailed(m.id)
+                      : undefined
+                  }
                 />
               )
             )}
-            {busy && <Typing key="typing" />}
           </div>
         )}
       </div>
-      <Composer onSend={send} busy={busy} />
+      <Composer onSend={send} busy={busy} statusHint={statusHint} />
     </div>
   );
 }

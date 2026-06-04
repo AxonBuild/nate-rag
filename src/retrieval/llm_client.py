@@ -92,3 +92,31 @@ class LLMClient:
             max_tokens=1500,
         )
         return response.choices[0].message.content.strip()
+
+    async def generate_answer_stream(
+        self,
+        question: str,
+        context_text: str,
+        chat_history: list[dict[str, Any]] | None = None,
+        system_prompt_override: str | None = None,
+    ):
+        """Yield answer text chunks as they arrive from the LLM."""
+        system = system_prompt_override.strip() if system_prompt_override else CHAT_SYSTEM_PROMPT
+        user_prompt = build_user_prompt(context_text=context_text, question=question)
+
+        messages = [{"role": "system", "content": system}]
+        for msg in (chat_history or [])[-10:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": user_prompt})
+
+        stream = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=1500,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield delta

@@ -362,6 +362,20 @@ class SearchService:
             "timing":         timing,
         }
 
+    @staticmethod
+    def format_client_search(search_result: dict[str, Any]) -> dict[str, Any]:
+        """Shape search payload for the frontend (ranked source cards)."""
+        results = []
+        for i, r in enumerate(search_result.get("results") or [], 1):
+            row = dict(r)
+            row["rank"] = i
+            results.append(row)
+        return {
+            "refined_query": search_result.get("refined_query", ""),
+            "keywords": search_result.get("keywords", []),
+            "results": results,
+        }
+
     async def chat(
         self,
         question: str,
@@ -396,9 +410,116 @@ class SearchService:
 
         return {
             "answer":  answer,
-            "search":  search_result,
+            "search":  self.format_client_search(search_result),
             "timing":  search_result["timing"],
         }
+
+    async def chat_stream(
+        self,
+        question: str,
+        chat_history: list[dict[str, Any]] | None = None,
+        topic: Optional[str] = None,
+        doc_type: Optional[str] = None,
+        system_prompt_override: Optional[str] = None,
+    ):
+        """
+        Async generator of SSE-style events:
+          status (refining | retrieving | generating)
+          token  (answer text chunk)
+          done   (search + timing)
+          error  (message)
+        """
+        chat_start = time.time()
+        timing: dict[str, float] = {}
+
+        try:
+            yield {"event": "status", "data": {"phase": "refining"}}
+
+            t0 = time.time()
+            refinement = await self.llm.refine_query(question, chat_history=chat_history)
+            timing["query_refinement_ms"] = (time.time() - t0) * 1000
+
+            refined_query = refinement["refined_query"]
+            keywords = refinement["keywords"]
+            n_chunks = refinement.get("number_of_chunks") or settings.retrieval_limit_final
+
+            yield {"event": "status", "data": {"phase": "retrieving"}}
+
+            t0 = time.time()
+            query_vector = await self.embedding_service.generate_embedding(refined_query)
+            timing["embedding_ms"] = (time.time() - t0) * 1000
+
+            score_threshold = settings.retrieval_min_score_final or None
+            prefetch_limit = settings.retrieval_page_prefetch_limit
+
+            t1 = time.time()
+            kb_result, qa_results = await asyncio.gather(
+                self._search_kb(
+                    query_vector=query_vector,
+                    keywords=keywords,
+                    page_limit=settings.retrieval_limit_pages,
+                    paragraph_limit=settings.retrieval_limit_paragraphs,
+                    content_limit=n_chunks,
+                    score_threshold=score_threshold,
+                    prefetch_limit=prefetch_limit,
+                    topic=topic,
+                    doc_type=doc_type,
+                ),
+                self._search_qa(
+                    query_vector=query_vector,
+                    keywords=keywords,
+                    limit=5,
+                    score_threshold=score_threshold,
+                ),
+            )
+            timing["retrieval_ms"] = (time.time() - t1) * 1000
+
+            kb_content = kb_result["content"]
+            merged = sorted(
+                kb_content + qa_results,
+                key=lambda x: x.get("score", 0.0),
+                reverse=True,
+            )[:n_chunks]
+
+            search_result = {
+                "query": question,
+                "refined_query": refined_query,
+                "keywords": keywords,
+                "results": merged,
+                "timing": timing,
+            }
+
+            kb_chunks = [r for r in merged if r.get("file_type") != "qa_pair"]
+            qa_chunks = [r for r in merged if r.get("file_type") == "qa_pair"]
+            context_text = build_context_text(kb_chunks, qa_chunks)
+
+            yield {"event": "status", "data": {"phase": "generating"}}
+
+            t0 = time.time()
+            answer_parts: list[str] = []
+            async for chunk in self.llm.generate_answer_stream(
+                question=question,
+                context_text=context_text,
+                chat_history=chat_history,
+                system_prompt_override=system_prompt_override,
+            ):
+                answer_parts.append(chunk)
+                yield {"event": "token", "data": {"text": chunk}}
+
+            timing["answer_generation_ms"] = (time.time() - t0) * 1000
+            timing["total_chat_ms"] = (time.time() - chat_start) * 1000
+
+            yield {
+                "event": "done",
+                "data": {
+                    "answer": "".join(answer_parts),
+                    "search": self.format_client_search(search_result),
+                    "timing": timing,
+                },
+            }
+        except Exception as e:
+            logger.error(f"Chat stream error: {e}", exc_info=True)
+            yield {"event": "error", "data": {"message": str(e)}}
 
     def _log_results(self, results: list[dict[str, Any]]) -> None:
         logger.info("=" * 70)

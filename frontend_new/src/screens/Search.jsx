@@ -6,7 +6,7 @@ import Performance from '../components/Performance.jsx';
 import { api } from '../api/client.js';
 import { filterPayload } from '../utils/filters.js';
 
-export default function Search({ filters, isAdmin }) {
+export default function Search({ filters }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
@@ -101,7 +101,7 @@ export default function Search({ filters, isAdmin }) {
             </div>
             <SourceList results={res.results} />
 
-            {isAdmin && res.timing && (
+            {res.timing && (
               <div style={{ marginTop: 16 }}>
                 <Disclosure
                   icon={Clock}

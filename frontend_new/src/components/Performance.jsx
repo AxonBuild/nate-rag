@@ -1,3 +1,7 @@
+function formatSeconds(ms) {
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
 export default function Performance({ timing }) {
   const rows = [
     { name: 'Query refinement', ms: timing.query_refinement_ms },
@@ -15,14 +19,14 @@ export default function Performance({ timing }) {
           <div className="perf-row" key={i}>
             <span className="perf-name">{r.name}</span>
             <div className="perf-track"><div className="perf-fill" style={{ width: `${(r.ms / max) * 100}%` }} /></div>
-            <span className="perf-ms">{r.ms} ms</span>
+            <span className="perf-ms">{formatSeconds(r.ms)}</span>
           </div>
         ))}
       </div>
       {timing.total_chat_ms != null && (
         <div className="perf-total">
           <span className="muted">Total response time</span>
-          <span className="v">{(timing.total_chat_ms / 1000).toFixed(2)} s</span>
+          <span className="v">{formatSeconds(timing.total_chat_ms)}</span>
         </div>
       )}
     </div>
