@@ -9,12 +9,17 @@ export function setStreamAuthTokenGetter(fn) {
   getAuthToken = fn;
 }
 
-const STATUS_LABELS = {
-  refining: 'Refining your question…',
-  retrieving: 'Searching the knowledge base…',
-  generating: 'Writing answer…',
-  verifying: 'Reviewing answer against sources…',
-};
+/** Ordered pipeline phases emitted by POST /chat/stream */
+export const CHAT_PIPELINE = [
+  { id: 'refining', label: 'Refining your question' },
+  { id: 'retrieving', label: 'Searching the knowledge base' },
+  { id: 'generating', label: 'Writing your answer' },
+  { id: 'verifying', label: 'Reviewing against sources' },
+];
+
+const STATUS_LABELS = Object.fromEntries(
+  CHAT_PIPELINE.map((p) => [p.id, `${p.label}…`])
+);
 
 export function statusLabel(phase) {
   return STATUS_LABELS[phase] || 'Working…';

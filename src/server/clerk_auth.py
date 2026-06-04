@@ -86,6 +86,19 @@ def user_is_admin(clerk_user: dict[str, Any]) -> bool:
     return role == "admin"
 
 
+async def require_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> dict[str, str]:
+    """Any signed-in Clerk user (JWT sub only — no extra Clerk API call)."""
+    if not credentials or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Authorization required")
+    payload = decode_session_token(credentials.credentials)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    return {"clerk_user_id": user_id}
+
+
 async def require_admin(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> dict[str, Any]:

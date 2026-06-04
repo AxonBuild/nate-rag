@@ -8,6 +8,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.retrieval.search_service import SearchService
+from src.server.chat_persistence import begin_turn, finish_turn
+from src.server.clerk_auth import require_user
 from src.server.dependencies import get_search_service
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    conversation_id: Optional[str] = None
     chat_history: Optional[list[ChatMessage]] = None
     topic: Optional[str] = None
     doc_type: Optional[str] = None
@@ -76,15 +79,27 @@ def _sse_message(event: str, data: dict[str, Any]) -> str:
 async def chat_stream(
     request: ChatRequest,
     service: SearchService = Depends(get_search_service),
+    user: dict[str, str] = Depends(require_user),
 ):
     """SSE stream: status events, then done with full verified answer."""
     if not request.question or not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     async def event_generator():
-        history = [{"role": m.role, "content": m.content} for m in (request.chat_history or [])]
+        clerk_id = user["clerk_user_id"]
+        try:
+            conv_id, history = await begin_turn(
+                clerk_id,
+                request.question.strip(),
+                request.conversation_id,
+            )
+        except ValueError:
+            yield _sse_message("error", {"message": "Conversation not found"})
+            return
+
         logger.info(
-            "[chat] POST /chat/stream history=%d retrieval_limit=%s",
+            "[chat] POST /chat/stream conversation_id=%s history=%d retrieval_limit=%s",
+            conv_id,
             len(history),
             request.retrieval_limit,
         )
@@ -99,11 +114,27 @@ async def chat_stream(
             ):
                 if item["event"] == "status":
                     logger.info("[chat] sse status phase=%s", item["data"].get("phase"))
+                    yield _sse_message(item["event"], item["data"])
                 elif item["event"] == "done":
-                    logger.info("[chat] sse done answer_chars=%d", len(item["data"].get("answer") or ""))
+                    data = dict(item["data"])
+                    data["conversation_id"] = conv_id
+                    await finish_turn(
+                        clerk_id,
+                        conv_id,
+                        data.get("answer") or "",
+                        search=data.get("search"),
+                        timing=data.get("timing"),
+                        verification=data.get("verification"),
+                    )
+                    logger.info(
+                        "[chat] sse done conversation_id=%s answer_chars=%d",
+                        conv_id,
+                        len(data.get("answer") or ""),
+                    )
+                    yield _sse_message("done", data)
                 elif item["event"] == "error":
                     logger.error("[chat] sse error %s", item["data"].get("message"))
-                yield _sse_message(item["event"], item["data"])
+                    yield _sse_message(item["event"], item["data"])
         except Exception as e:
             logger.error("[chat] stream route error: %s", e, exc_info=True)
             yield _sse_message("error", {"message": str(e)})

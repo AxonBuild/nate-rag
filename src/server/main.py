@@ -1,14 +1,16 @@
 """FastAPI server for nate-rag."""
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.db.database import init_db
 from src.ingestion.config import settings
 from src.ingestion.qdrant_client import QdrantClient
 from src.server.dependencies import get_qdrant_client
-from src.server.routes import admin, chat, search
+from src.server.routes import admin, chat, conversations, search
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,7 +19,13 @@ logging.basicConfig(
 logging.getLogger("nate.chat").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Nate's AI API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(title="Nate's AI API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(chat.router)
+app.include_router(conversations.router)
 app.include_router(search.router)
 app.include_router(admin.router)
 

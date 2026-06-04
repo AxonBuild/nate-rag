@@ -6,7 +6,8 @@ import { SourceList } from '../components/SourceCard.jsx';
 import Performance from '../components/Performance.jsx';
 import Refinement from '../components/Refinement.jsx';
 import { SUGGESTIONS } from '../constants/suggestions.js';
-import { chatStream, statusLabel } from '../api/chatStream.js';
+import { chatStream } from '../api/chatStream.js';
+import ChatStatusPipeline from '../components/ChatStatusPipeline.jsx';
 import { useAnswerReveal } from '../hooks/useAnswerReveal.js';
 import { requestSettingsPayload } from '../utils/settings.js';
 
@@ -46,18 +47,19 @@ function CopyBtn({ text }) {
 
 function AiMessage({ msg, onRegenerate, onRetry }) {
   const streaming = Boolean(msg.streaming);
-  const showMetaStatus = streaming && msg.status && !msg.answer;
+  const showPipeline = streaming && !msg.answer && !msg.error && (msg.status || msg.retryHint);
 
   return (
     <div className="msg ai msg-enter">
       <div className="mavatar"><Sparkles size={18} /></div>
       <div className="msg-body">
         <div className="msg-meta">
-          <span className="who">Nate&apos;s AI</span>
-          {showMetaStatus ? (
-            <span className="muted" style={{ fontSize: 12 }}>{statusLabel(msg.status)}</span>
-          ) : (
+          <div className="msg-meta-head">
+            <span className="who">Nate&apos;s AI</span>
             <span className="ts">{msg.ts}</span>
+          </div>
+          {showPipeline && (
+            <ChatStatusPipeline currentPhase={msg.status} retryHint={msg.retryHint} />
           )}
         </div>
         {msg.error ? (
@@ -72,9 +74,7 @@ function AiMessage({ msg, onRegenerate, onRetry }) {
               </div>
             )}
           </>
-        ) : streaming && !msg.answer ? (
-          <div className="typing"><span /><span /><span /></div>
-        ) : streaming ? (
+        ) : showPipeline ? null : streaming ? (
           <div className="ai-content">
             <Markdown text={msg.answer || ''} />
             <span className="cursor-blink" />
@@ -183,7 +183,7 @@ function Empty({ userName, onPick }) {
   );
 }
 
-function Composer({ onSend, busy, statusHint }) {
+function Composer({ onSend, busy }) {
   const [val, setVal] = useState('');
   const ref = useRef(null);
 
@@ -227,7 +227,7 @@ function Composer({ onSend, busy, statusHint }) {
             <span className="kbd">Enter</span> to send · <span className="kbd">Shift+Enter</span> new line
           </span>
           <span className="faint">
-            {busy && statusHint ? statusHint : busy ? 'Nate\'s AI is responding…' : 'Answers cite firm sources'}
+            {busy ? 'Nate\'s AI is working on your answer…' : 'Answers cite firm sources'}
           </span>
         </div>
       </div>
@@ -246,10 +246,18 @@ function buildHistory(messages) {
     .slice(-10);
 }
 
-export default function Chat({ messages, setMessages, busy, setBusy, settings, user }) {
+export default function Chat({
+  messages,
+  setMessages,
+  busy,
+  setBusy,
+  settings,
+  user,
+  conversationId,
+  onConversationId,
+}) {
   const threadRef = useRef(null);
   const lastUserRef = useRef('');
-  const [statusHint, setStatusHint] = useState('');
 
   const initials = user?.name
     ? user.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
@@ -285,6 +293,7 @@ export default function Chat({ messages, setMessages, busy, setBusy, settings, u
         error: false,
         streaming: true,
         status: 'refining',
+        retryHint: undefined,
         search: undefined,
         timing: undefined,
         ts: now(),
@@ -298,6 +307,7 @@ export default function Chat({ messages, setMessages, busy, setBusy, settings, u
           role: 'ai',
           answer: '',
           status: 'refining',
+          retryHint: undefined,
           streaming: true,
           ts: now(),
         },
@@ -305,14 +315,14 @@ export default function Chat({ messages, setMessages, busy, setBusy, settings, u
     }
 
     setBusy(true);
-    setStatusHint(statusLabel('refining'));
 
     const historySource = retryAiId
       ? messages.filter((m) => m.id !== retryAiId)
       : messages;
     const body = {
       question: text,
-      chat_history: buildHistory(historySource),
+      conversation_id: conversationId || undefined,
+      ...(!conversationId ? { chat_history: buildHistory(historySource) } : {}),
       ...requestSettingsPayload(settings),
     };
 
@@ -324,17 +334,16 @@ export default function Chat({ messages, setMessages, busy, setBusy, settings, u
             error: false,
             streaming: true,
             status: 'refining',
+            retryHint: `Retrying (${attempt}/${maxRetries})…`,
             search: undefined,
             timing: undefined,
           });
-          setStatusHint(`Retrying (${attempt}/${maxRetries})…`);
         },
         onStatus: (phase) => {
-          patchAi(aiId, { status: phase, answer: '' });
-          setStatusHint(statusLabel(phase));
+          patchAi(aiId, { status: phase, retryHint: undefined, answer: '' });
         },
         onDone: (data) => {
-          setStatusHint('');
+          if (data.conversation_id) onConversationId?.(data.conversation_id);
           revealAnswer(aiId, data);
         },
       });
@@ -344,10 +353,10 @@ export default function Chat({ messages, setMessages, busy, setBusy, settings, u
         error: true,
         streaming: false,
         status: null,
+        retryHint: undefined,
       });
     } finally {
       setBusy(false);
-      setStatusHint('');
     }
   };
 
@@ -391,7 +400,7 @@ export default function Chat({ messages, setMessages, busy, setBusy, settings, u
           </div>
         )}
       </div>
-      <Composer onSend={send} busy={busy || isRevealing} statusHint={statusHint} />
+      <Composer onSend={send} busy={busy || isRevealing} />
     </div>
   );
 }

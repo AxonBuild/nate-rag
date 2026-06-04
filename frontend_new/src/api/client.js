@@ -39,4 +39,10 @@ export const api = {
   config: ()     => request('/config/'),
   inviteUser: (body) => request('/admin/invitations', json(body)),
   listInvitations: () => request('/admin/invitations'),
+  listConversations: () => request('/conversations'),
+  createConversation: (body = {}) =>
+    request('/conversations', { method: 'POST', ...json(body) }),
+  getConversation: (id) => request(`/conversations/${id}`),
+  deleteConversation: (id) =>
+    request(`/conversations/${id}`, { method: 'DELETE' }),
 };

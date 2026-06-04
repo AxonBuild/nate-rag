@@ -1,31 +1,68 @@
-import { MessageSquare, Search, BarChart2, UserPlus, PanelLeft, LogOut, SlidersHorizontal, FileText } from 'lucide-react';
+import {
+  MessageSquare,
+  Search,
+  BarChart2,
+  UserPlus,
+  PanelLeft,
+  LogOut,
+  SlidersHorizontal,
+  FileText,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import LogoMark from './LogoMark.jsx';
 
 function NavLink({ id, icon: Icon, label, active, collapsed, onClick }) {
   return (
-    <button className={`sb-link${active ? ' active' : ''}`} onClick={onClick} title={collapsed ? label : undefined}>
+    <button
+      className={`sb-link${active ? ' active' : ''}`}
+      onClick={onClick}
+      title={collapsed ? label : undefined}
+    >
       <Icon size={18} />
       {!collapsed && <span className="hide-collapsed">{label}</span>}
     </button>
   );
 }
 
-export default function Sidebar({ view, setView, collapsed, setCollapsed, onLogout, user, isAdmin }) {
+export default function Sidebar({
+  view,
+  setView,
+  collapsed,
+  setCollapsed,
+  onLogout,
+  user,
+  isAdmin,
+  conversations = [],
+  activeConversationId,
+  onSelectConversation,
+  onNewChat,
+  onDeleteConversation,
+  chatsLoading,
+  deletingConversationId,
+}) {
   const nav = [
     { id: 'chat', icon: MessageSquare, label: 'Chat' },
     { id: 'search', icon: Search, label: 'Search' },
     { id: 'retrieval', icon: SlidersHorizontal, label: 'Retrieval' },
     { id: 'prompt', icon: FileText, label: 'System prompt' },
-    ...(isAdmin ? [
-      { id: 'stats', icon: BarChart2, label: 'Statistics' },
-      { id: 'invites', icon: UserPlus, label: 'Invites' },
-    ] : []),
+    ...(isAdmin
+      ? [
+          { id: 'stats', icon: BarChart2, label: 'Statistics' },
+          { id: 'invites', icon: UserPlus, label: 'Invites' },
+        ]
+      : []),
   ];
 
   const roleLabel = isAdmin ? 'Admin · Meeker CPA' : 'Client · Meeker CPA';
 
   const initials = user?.name
-    ? user.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+    ? user.name
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
     : 'U';
 
   return (
@@ -38,7 +75,11 @@ export default function Sidebar({ view, setView, collapsed, setCollapsed, onLogo
             <span className="sub">Tax · Real Estate</span>
           </div>
         )}
-        <button className="sb-collapse" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Expand' : 'Collapse'}>
+        <button
+          className="sb-collapse"
+          onClick={() => setCollapsed(!collapsed)}
+          title={collapsed ? 'Expand' : 'Collapse'}
+        >
           <PanelLeft size={17} />
         </button>
       </div>
@@ -55,6 +96,62 @@ export default function Sidebar({ view, setView, collapsed, setCollapsed, onLogo
             />
           ))}
         </nav>
+
+        {!collapsed && (
+          <div className="sb-chats hide-collapsed">
+            <div className="sb-chats-head">
+              <span>Chats</span>
+              <button
+                type="button"
+                className="sb-new-chat"
+                title="New chat"
+                onClick={onNewChat}
+              >
+                <Plus size={15} />
+              </button>
+            </div>
+            <div className="sb-chats-list">
+              {chatsLoading && conversations.length === 0 ? (
+                <p className="sb-chats-empty">Loading…</p>
+              ) : conversations.length === 0 ? (
+                <p className="sb-chats-empty">No conversations yet</p>
+              ) : (
+                conversations.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`sb-chat-row${
+                      c.id === activeConversationId ? ' active' : ''
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="sb-chat-item"
+                      title={c.title}
+                      onClick={() => onSelectConversation(c.id)}
+                      disabled={deletingConversationId === c.id}
+                    >
+                      <MessageSquare size={14} />
+                      <span className="sb-chat-title">{c.title}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="sb-chat-delete"
+                      title="Delete chat"
+                      aria-label={`Delete ${c.title}`}
+                      disabled={deletingConversationId === c.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteConversation?.(c.id);
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="sb-foot">

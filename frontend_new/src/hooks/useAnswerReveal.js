@@ -32,6 +32,7 @@ export function useAnswerReveal(patchAi) {
         timing: data.timing,
         verification: data.verification ?? null,
         status: null,
+        retryHint: undefined,
         error: false,
       };
 
