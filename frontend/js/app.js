@@ -1,5 +1,5 @@
 /**
- * Nate RAG Assistant — Frontend
+ * Nate's AI — Frontend
  */
 (function () {
   const state = {

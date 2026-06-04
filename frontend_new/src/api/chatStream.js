@@ -13,6 +13,7 @@ const STATUS_LABELS = {
   refining: 'Refining your question…',
   retrieving: 'Searching the knowledge base…',
   generating: 'Writing answer…',
+  verifying: 'Reviewing answer against sources…',
 };
 
 export function statusLabel(phase) {
@@ -118,7 +119,8 @@ async function chatStreamOnce(body, { onStatus, onToken, onDone, onError } = {})
 }
 
 /**
- * POST /chat/stream — SSE with status, token, done, error events.
+ * POST /chat/stream — SSE with status, done, error events.
+ * Full answer arrives on `done`; UI reveals it with a local typewriter effect.
  * Retries automatically on timeouts and transient failures.
  */
 export async function chatStream(body, handlers = {}, { maxRetries = DEFAULT_MAX_RETRIES } = {}) {

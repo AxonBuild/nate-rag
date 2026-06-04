@@ -4,9 +4,9 @@ import Disclosure from '../components/Disclosure.jsx';
 import { SourceList } from '../components/SourceCard.jsx';
 import Performance from '../components/Performance.jsx';
 import { api } from '../api/client.js';
-import { filterPayload } from '../utils/filters.js';
+import { requestSettingsPayload } from '../utils/settings.js';
 
-export default function Search({ filters }) {
+export default function Search({ settings }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
@@ -19,7 +19,7 @@ export default function Search({ filters }) {
     setRes(null);
     setError('');
     try {
-      const data = await api.search({ query: v, ...filterPayload(filters) });
+      const data = await api.search({ query: v, ...requestSettingsPayload(settings) });
       setRes({
         original: data.query || v,
         refined: data.refined_query,
@@ -35,14 +35,12 @@ export default function Search({ filters }) {
   };
 
   const totalMs = res?.timing?.total_chat_ms ?? res?.timing?.total_ms;
-  const hasFilters = filters.topic !== 'All' || filters.docType !== 'All';
-
   return (
     <div className="page-scroll scroll">
       <div className="page-inner fade-in">
         <h1 className="page-h">Search the knowledge base</h1>
         <p className="page-sub">
-          Semantic search across guides, scripts, SEO content, and client Q&amp;A. Results respect your sidebar filters.
+          Semantic search across guides, scripts, SEO content, and client Q&amp;A.
         </p>
 
         <div className="search-bar">
@@ -57,14 +55,6 @@ export default function Search({ filters }) {
             {busy ? 'Searching…' : (<><SearchIcon size={15} /> Search</>)}
           </button>
         </div>
-
-        {hasFilters && (
-          <div style={{ display: 'flex', gap: 7, marginTop: 13, alignItems: 'center' }}>
-            <span className="faint" style={{ fontSize: 12 }}>Active filters:</span>
-            {filters.topic !== 'All' && <span className="pill">{filters.topic}</span>}
-            {filters.docType !== 'All' && <span className="pill doc">{filters.docType}</span>}
-          </div>
-        )}
 
         {error && (
           <p style={{ marginTop: 20, color: '#e05a5a', fontSize: 14 }}>{error}</p>

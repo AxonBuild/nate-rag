@@ -87,10 +87,10 @@ export default function Login({ theme, toggleTheme }) {
 
       <div className="login-card fade-in">
         <div className="login-mark"><LogoMark size={54} /></div>
-        <h1>{isInvite ? 'Accept your invitation' : 'Welcome to Nate AI'}</h1>
+        <h1>{isInvite ? 'Accept your invitation' : 'Welcome to Nate\u2019s AI'}</h1>
         <p className="login-tag">
           {isInvite
-            ? 'Enter your name and password to join Meeker CPA\u2019s Nate AI workspace.'
+            ? 'Enter your name and password to join Meeker CPA\u2019s Nate\u2019s AI workspace.'
             : 'Your AI-powered tax & real estate advisor'}
         </p>
 

@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.retrieval.search_service import SearchService
 from src.server.dependencies import get_search_service
 
@@ -20,6 +20,7 @@ class SearchRequest(BaseModel):
     chat_history: Optional[list[SearchMessage]] = None
     topic: Optional[str] = None
     doc_type: Optional[str] = None
+    retrieval_limit: Optional[int] = Field(default=None, ge=5, le=20)
 
 
 class SearchResponse(BaseModel):
@@ -45,6 +46,7 @@ async def search(
             chat_history=history or None,
             topic=request.topic,
             doc_type=request.doc_type,
+            retrieval_limit=request.retrieval_limit,
         )
         return SearchResponse(
             query=result["query"],

@@ -7,7 +7,8 @@ export default function Performance({ timing }) {
     { name: 'Query refinement', ms: timing.query_refinement_ms },
     { name: 'Embedding',        ms: timing.embedding_ms },
     { name: 'Retrieval',        ms: timing.retrieval_ms },
-    { name: 'Answer generation',ms: timing.answer_generation_ms },
+    { name: 'Answer generation', ms: timing.answer_generation_ms },
+    { name: 'Verification', ms: timing.verification_ms },
   ].filter(r => r.ms != null && r.ms > 0);
 
   const max = Math.max(...rows.map(r => r.ms), 1);

@@ -132,7 +132,7 @@ export default function Stats() {
     <div className="page-scroll scroll">
       <div className="page-inner fade-in">
         <h1 className="page-h">System Statistics</h1>
-        <p className="page-sub">Live health and composition of the Nate AI knowledge base.</p>
+        <p className="page-sub">Live health and composition of the Nate&apos;s AI knowledge base.</p>
 
         <div className="stat-grid">
           <StatCard icon={Layers} color="var(--type-qa)" value={fmt(points)} label="Total Points" delta="+340 this week" />

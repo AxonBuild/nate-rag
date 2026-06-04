@@ -1,12 +1,9 @@
 """FastAPI server for nate-rag."""
 import asyncio
 import logging
-from pathlib import Path
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from src.ingestion.config import settings
 from src.ingestion.qdrant_client import QdrantClient
@@ -15,13 +12,12 @@ from src.server.routes import admin, chat, search
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
+logging.getLogger("nate.chat").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
-
-app = FastAPI(title="Nate RAG Assistant", version="1.0.0")
+app = FastAPI(title="Nate's AI API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,18 +31,10 @@ app.include_router(chat.router)
 app.include_router(search.router)
 app.include_router(admin.router)
 
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
-
 
 @app.get("/")
-async def root(request: Request):
-    accept = request.headers.get("accept", "")
-    if "text/html" in accept and "application/json" not in accept.split(",")[0]:
-        index_path = FRONTEND_DIR / "index.html"
-        if index_path.exists():
-            return FileResponse(index_path, media_type="text/html")
-    return {"message": "Nate RAG API", "docs": "/docs"}
+async def root():
+    return {"message": "Nate's AI API", "docs": "/docs"}
 
 
 @app.get("/health")

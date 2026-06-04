@@ -21,6 +21,7 @@ from qdrant_client.models import (
 )
 from src.retrieval.llm_client import LLMClient
 from src.retrieval.prompts.chat_answer import build_context_text
+from src.retrieval import chat_logging as chat_log
 
 logger = logging.getLogger(__name__)
 
@@ -279,12 +280,26 @@ class SearchService:
     # Public API
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _resolve_n_chunks(
+        refinement: dict[str, Any],
+        retrieval_limit: Optional[int] = None,
+    ) -> int:
+        """Final merged chunk cap: explicit override, else refinement, else config default."""
+        if retrieval_limit is not None:
+            return max(5, min(20, int(retrieval_limit)))
+        n = refinement.get("number_of_chunks")
+        if n is not None:
+            return max(5, min(20, int(n)))
+        return settings.retrieval_limit_final
+
     async def search(
         self,
         query: str,
         chat_history: list[dict[str, Any]] | None = None,
         topic: Optional[str] = None,
         doc_type: Optional[str] = None,
+        retrieval_limit: Optional[int] = None,
     ) -> dict[str, Any]:
         """
         Full retrieval pipeline: refine → embed → parallel KB+QA search → merge.
@@ -300,10 +315,9 @@ class SearchService:
         timing["query_refinement_ms"] = (time.time() - t0) * 1000
         refined_query    = refinement["refined_query"]
         keywords         = refinement["keywords"]
-        n_chunks         = refinement.get("number_of_chunks") or settings.retrieval_limit_final
+        n_chunks = self._resolve_n_chunks(refinement, retrieval_limit)
 
-        logger.info(f"Refined: {refined_query}")
-        logger.info(f"Keywords: {keywords}")
+        chat_log.log_refinement(refinement, n_chunks, timing["query_refinement_ms"])
 
         # 2. Embed
         t0 = time.time()
@@ -347,6 +361,17 @@ class SearchService:
 
         timing["total_ms"] = (time.time() - start) * 1000
 
+        kb_n = len([r for r in merged if r.get("file_type") != "qa_pair"])
+        qa_n = len([r for r in merged if r.get("file_type") == "qa_pair"])
+        top = merged[0].get("score") if merged else None
+        chat_log.log_retrieval(
+            elapsed_ms=timing["retrieval_ms"],
+            n_chunks=n_chunks,
+            kb_count=kb_n,
+            qa_count=qa_n,
+            context_chars=0,
+            top_score=top,
+        )
         self._log_results(merged)
 
         return {
@@ -361,6 +386,50 @@ class SearchService:
             "total_results":  len(merged),
             "timing":         timing,
         }
+
+    async def _finalize_answer(
+        self,
+        question: str,
+        context_text: str,
+        draft: str,
+        timing: dict[str, float],
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Verify draft against context; return final answer and optional metadata."""
+        if not settings.enable_answer_verification:
+            chat_log.logger.info("[chat] verification skipped (disabled)")
+            return draft, None
+
+        chat_log.logger.info(
+            "[chat] phase=verifying draft_chars=%d context_chars=%d",
+            len(draft),
+            len(context_text),
+        )
+        t0 = time.time()
+        verdict, attempts = await self.llm.verify_answer(
+            question=question,
+            context_text=context_text,
+            draft_answer=draft,
+        )
+        timing["verification_ms"] = (time.time() - t0) * 1000
+        if attempts > 1:
+            timing["verification_attempts"] = attempts
+
+        if verdict["is_correct"]:
+            final = draft
+        else:
+            final = (verdict.get("corrected_answer") or "").strip() or draft
+            chat_log.logger.info(
+                "[chat] verification applied correction final_chars=%d (was draft_chars=%d)",
+                len(final),
+                len(draft),
+            )
+
+        meta = {
+            "is_correct": verdict["is_correct"],
+            "reasoning": verdict["reasoning"],
+            "was_corrected": not verdict["is_correct"],
+        }
+        return final, meta
 
     @staticmethod
     def format_client_search(search_result: dict[str, Any]) -> dict[str, Any]:
@@ -383,35 +452,78 @@ class SearchService:
         topic: Optional[str] = None,
         doc_type: Optional[str] = None,
         system_prompt_override: Optional[str] = None,
+        retrieval_limit: Optional[int] = None,
     ) -> dict[str, Any]:
         """Retrieve context then generate a grounded answer."""
         chat_start = time.time()
+        chat_log.log_request(
+            mode="sync",
+            question=question,
+            history_len=len(chat_history or []),
+            retrieval_limit=retrieval_limit,
+            topic=topic,
+            doc_type=doc_type,
+            has_system_override=bool(system_prompt_override and system_prompt_override.strip()),
+        )
 
         search_result = await self.search(
             query=question,
             chat_history=chat_history,
             topic=topic,
             doc_type=doc_type,
+            retrieval_limit=retrieval_limit,
         )
 
         kb_chunks = [r for r in search_result["results"] if r.get("file_type") != "qa_pair"]
         qa_chunks = [r for r in search_result["results"] if r.get("file_type") == "qa_pair"]
         context_text = build_context_text(kb_chunks, qa_chunks)
+        merged_results = search_result["results"]
+        chat_log.log_retrieval(
+            elapsed_ms=search_result["timing"].get("retrieval_ms", 0),
+            n_chunks=len(merged_results),
+            kb_count=len(kb_chunks),
+            qa_count=len(qa_chunks),
+            context_chars=len(context_text),
+            top_score=merged_results[0].get("score") if merged_results else None,
+        )
 
         t0 = time.time()
-        answer = await self.llm.generate_answer(
+        draft = await self.llm.generate_answer(
             question=question,
             context_text=context_text,
             chat_history=chat_history,
             system_prompt_override=system_prompt_override,
         )
         search_result["timing"]["answer_generation_ms"] = (time.time() - t0) * 1000
+        chat_log.log_generation(
+            elapsed_ms=search_result["timing"]["answer_generation_ms"],
+            model=self.llm.model,
+            draft_chars=len(draft),
+            context_chars=len(context_text),
+            history_len=len(chat_history or []),
+        )
+
+        answer, verification = await self._finalize_answer(
+            question=question,
+            context_text=context_text,
+            draft=draft,
+            timing=search_result["timing"],
+        )
         search_result["timing"]["total_chat_ms"] = (time.time() - chat_start) * 1000
+        formatted = self.format_client_search(search_result)
+        chat_log.log_complete(
+            mode="sync",
+            timing=search_result["timing"],
+            verification=verification,
+            answer_chars=len(answer),
+            source_count=len(formatted.get("results") or []),
+        )
 
         return {
-            "answer":  answer,
-            "search":  self.format_client_search(search_result),
-            "timing":  search_result["timing"],
+            "answer": answer,
+            "search": formatted,
+            "timing": search_result["timing"],
+            "verification": verification,
         }
 
     async def chat_stream(
@@ -421,19 +533,29 @@ class SearchService:
         topic: Optional[str] = None,
         doc_type: Optional[str] = None,
         system_prompt_override: Optional[str] = None,
+        retrieval_limit: Optional[int] = None,
     ):
         """
         Async generator of SSE-style events:
-          status (refining | retrieving | generating)
-          token  (answer text chunk)
-          done   (search + timing)
+          status (refining | retrieving | generating | verifying)
+          done   (full answer + search + timing + verification)
           error  (message)
         """
         chat_start = time.time()
         timing: dict[str, float] = {}
+        chat_log.log_request(
+            mode="stream",
+            question=question,
+            history_len=len(chat_history or []),
+            retrieval_limit=retrieval_limit,
+            topic=topic,
+            doc_type=doc_type,
+            has_system_override=bool(system_prompt_override and system_prompt_override.strip()),
+        )
 
         try:
             yield {"event": "status", "data": {"phase": "refining"}}
+            chat_log.logger.info("[chat] phase=refining started")
 
             t0 = time.time()
             refinement = await self.llm.refine_query(question, chat_history=chat_history)
@@ -441,13 +563,16 @@ class SearchService:
 
             refined_query = refinement["refined_query"]
             keywords = refinement["keywords"]
-            n_chunks = refinement.get("number_of_chunks") or settings.retrieval_limit_final
+            n_chunks = self._resolve_n_chunks(refinement, retrieval_limit)
+            chat_log.log_refinement(refinement, n_chunks, timing["query_refinement_ms"])
 
             yield {"event": "status", "data": {"phase": "retrieving"}}
+            chat_log.logger.info("[chat] phase=retrieving started n_chunks=%d", n_chunks)
 
             t0 = time.time()
             query_vector = await self.embedding_service.generate_embedding(refined_query)
             timing["embedding_ms"] = (time.time() - t0) * 1000
+            chat_log.log_phase("embedding", timing["embedding_ms"])
 
             score_threshold = settings.retrieval_min_score_final or None
             prefetch_limit = settings.retrieval_page_prefetch_limit
@@ -492,33 +617,66 @@ class SearchService:
             kb_chunks = [r for r in merged if r.get("file_type") != "qa_pair"]
             qa_chunks = [r for r in merged if r.get("file_type") == "qa_pair"]
             context_text = build_context_text(kb_chunks, qa_chunks)
+            chat_log.log_retrieval(
+                elapsed_ms=timing["retrieval_ms"],
+                n_chunks=n_chunks,
+                kb_count=len(kb_chunks),
+                qa_count=len(qa_chunks),
+                context_chars=len(context_text),
+                top_score=merged[0].get("score") if merged else None,
+            )
+            self._log_results(merged)
 
             yield {"event": "status", "data": {"phase": "generating"}}
+            chat_log.logger.info("[chat] phase=generating started context_chars=%d", len(context_text))
 
             t0 = time.time()
-            answer_parts: list[str] = []
-            async for chunk in self.llm.generate_answer_stream(
+            draft = await self.llm.generate_answer(
                 question=question,
                 context_text=context_text,
                 chat_history=chat_history,
                 system_prompt_override=system_prompt_override,
-            ):
-                answer_parts.append(chunk)
-                yield {"event": "token", "data": {"text": chunk}}
-
+            )
             timing["answer_generation_ms"] = (time.time() - t0) * 1000
+            chat_log.log_generation(
+                elapsed_ms=timing["answer_generation_ms"],
+                model=self.llm.model,
+                draft_chars=len(draft),
+                context_chars=len(context_text),
+                history_len=len(chat_history or []),
+            )
+
+            if settings.enable_answer_verification:
+                yield {"event": "status", "data": {"phase": "verifying"}}
+
+            answer, verification = await self._finalize_answer(
+                question=question,
+                context_text=context_text,
+                draft=draft,
+                timing=timing,
+            )
             timing["total_chat_ms"] = (time.time() - chat_start) * 1000
+            formatted = self.format_client_search(search_result)
+            chat_log.log_complete(
+                mode="stream",
+                timing=timing,
+                verification=verification,
+                answer_chars=len(answer),
+                source_count=len(formatted.get("results") or []),
+            )
+            chat_log.logger.info("[chat] emitting done event to client")
 
             yield {
                 "event": "done",
                 "data": {
-                    "answer": "".join(answer_parts),
-                    "search": self.format_client_search(search_result),
+                    "answer": answer,
+                    "search": formatted,
                     "timing": timing,
+                    "verification": verification,
                 },
             }
         except Exception as e:
-            logger.error(f"Chat stream error: {e}", exc_info=True)
+            logger.error("[chat] stream failed: %s", e, exc_info=True)
             yield {"event": "error", "data": {"message": str(e)}}
 
     def _log_results(self, results: list[dict[str, Any]]) -> None:

@@ -1,5 +1,5 @@
 /* ============================================================
-   Nate AI — Design System
+   Nate's AI — Design System
    Navy + Gold · DM Sans / Inter / IBM Plex Mono
    ============================================================ */
 
@@ -617,6 +617,36 @@ input, textarea, select { font-family: inherit; }
 .invite-name-row { display: flex; gap: 10px; }
 .invite-name-row .login-field { flex: 1; min-width: 0; }
 .invite-signup-form .login-btn { margin-top: 8px; }
+
+/* ============================================================
+   SETTINGS (RETRIEVAL / SYSTEM PROMPT)
+   ============================================================ */
+.settings-panel { margin-top: 8px; max-width: 560px; }
+.settings-panel-head {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display); font-weight: 600; font-size: 14.5px;
+  margin-bottom: 18px;
+}
+.settings-radio {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.settings-radio:last-of-type { border-bottom: none; }
+.settings-radio input { margin-top: 3px; accent-color: var(--accent); }
+.settings-radio strong { display: block; font-size: 13.5px; margin-bottom: 4px; }
+.block-sub { display: block; font-size: 12px; line-height: 1.45; margin-top: 2px; }
+.settings-field .sb-input { max-width: 120px; }
+.settings-textarea { min-height: 280px; width: 100%; resize: vertical; }
+.settings-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; flex-wrap: wrap; gap: 10px;
+}
+
+.verify-status {
+  font-family: var(--font-display); font-size: 13px; font-weight: 600; margin: 0;
+}
+.verify-status.ok { color: #5cb87a; }
+.verify-status.denied { color: #e8a04a; }
 
 /* ============================================================
    ANIMATIONS

@@ -6,21 +6,24 @@ import Chat from './screens/Chat.jsx';
 import Search from './screens/Search.jsx';
 import Stats from './screens/Stats.jsx';
 import Invites from './screens/Invites.jsx';
+import Retrieval from './screens/Retrieval.jsx';
+import SystemPrompt from './screens/SystemPrompt.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import AuthTokenBridge from './components/AuthTokenBridge.jsx';
 import { getRoleFromUser, ROLES } from './hooks/useAppRole.js';
+import { loadSettings, saveSettings } from './utils/settings.js';
 
 const THEME_KEY = 'nate_ai_theme';
 
 const TITLES = {
-  chat:   { title: 'New Conversation', crumb: 'Chat' },
+  chat: { title: 'New Conversation', crumb: 'Chat' },
   search: { title: 'Search', crumb: 'Knowledge Base' },
-  stats:   { title: 'Statistics', crumb: 'System' },
+  retrieval: { title: 'Retrieval', crumb: 'Settings' },
+  prompt: { title: 'System prompt', crumb: 'Settings' },
+  stats: { title: 'Statistics', crumb: 'System' },
   invites: { title: 'Invite users', crumb: 'Admin' },
 };
-
-const DEFAULT_ADV = { l0: '', l1: '', l2: '', sys: '' };
 
 function clerkDisplayUser(user) {
   if (!user) return { name: 'User', email: '' };
@@ -74,10 +77,17 @@ function AppShell({ user, onLogout, isAdmin }) {
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'dark');
   const [view, setView] = useState('chat');
   const [collapsed, setCollapsed] = useState(false);
-  const [filters, setFilters] = useState({ topic: 'All', docType: 'All' });
-  const [advanced, setAdvanced] = useState(DEFAULT_ADV);
+  const [settings, setSettingsState] = useState(() => loadSettings());
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
+
+  const setSettings = (updater) => {
+    setSettingsState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      saveSettings(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -103,13 +113,16 @@ function AppShell({ user, onLogout, isAdmin }) {
         setMessages={setMessages}
         busy={busy}
         setBusy={setBusy}
-        filters={filters}
-        advanced={advanced}
+        settings={settings}
         user={user}
       />
     );
   } else if (view === 'search') {
-    screen = <Search filters={filters} />;
+    screen = <Search settings={settings} />;
+  } else if (view === 'retrieval') {
+    screen = <Retrieval settings={settings} setSettings={setSettings} />;
+  } else if (view === 'prompt') {
+    screen = <SystemPrompt settings={settings} setSettings={setSettings} />;
   } else if (view === 'invites' && isAdmin) {
     screen = <Invites />;
   } else if (view === 'stats' && isAdmin) {
@@ -126,10 +139,6 @@ function AppShell({ user, onLogout, isAdmin }) {
         setView={setView}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
-        filters={filters}
-        setFilters={setFilters}
-        advanced={advanced}
-        setAdvanced={setAdvanced}
         onLogout={onLogout}
         user={user}
         isAdmin={isAdmin}

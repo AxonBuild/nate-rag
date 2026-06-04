@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, ArrowUp, Copy, Check, RefreshCw, Layers, Clock } from 'lucide-react';
+import { Sparkles, ArrowUp, Copy, Check, RefreshCw, Layers, Clock, ShieldCheck } from 'lucide-react';
 import Markdown from '../components/Markdown.jsx';
 import Disclosure from '../components/Disclosure.jsx';
 import { SourceList } from '../components/SourceCard.jsx';
@@ -7,7 +7,8 @@ import Performance from '../components/Performance.jsx';
 import Refinement from '../components/Refinement.jsx';
 import { SUGGESTIONS } from '../constants/suggestions.js';
 import { chatStream, statusLabel } from '../api/chatStream.js';
-import { filterPayload } from '../utils/filters.js';
+import { useAnswerReveal } from '../hooks/useAnswerReveal.js';
+import { requestSettingsPayload } from '../utils/settings.js';
 
 const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -17,6 +18,11 @@ function formatStreamError(err) {
     return 'This request timed out. Complex questions can take a while — tap Retry to try again.';
   }
   return `Something went wrong: ${raw}`;
+}
+
+function verificationLabel(verification) {
+  if (!verification) return null;
+  return verification.is_correct && !verification.was_corrected ? 'Succeeded' : 'Denied';
 }
 
 function CopyBtn({ text }) {
@@ -47,7 +53,7 @@ function AiMessage({ msg, onRegenerate, onRetry }) {
       <div className="mavatar"><Sparkles size={18} /></div>
       <div className="msg-body">
         <div className="msg-meta">
-          <span className="who">Nate AI</span>
+          <span className="who">Nate&apos;s AI</span>
           {showMetaStatus ? (
             <span className="muted" style={{ fontSize: 12 }}>{statusLabel(msg.status)}</span>
           ) : (
@@ -86,8 +92,22 @@ function AiMessage({ msg, onRegenerate, onRetry }) {
                 </button>
               )}
             </div>
-            {(msg.search || msg.timing) && (
+            {(msg.search || msg.timing || msg.verification) && (
               <div style={{ marginTop: 14 }}>
+                {msg.verification && (
+                  <Disclosure
+                    icon={ShieldCheck}
+                    label="Verification"
+                    count={verificationLabel(msg.verification)}
+                  >
+                    <p className={`verify-status ${msg.verification.is_correct && !msg.verification.was_corrected ? 'ok' : 'denied'}`}>
+                      {verificationLabel(msg.verification)}
+                    </p>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: '8px 0 0' }}>
+                      {msg.verification.reasoning}
+                    </p>
+                  </Disclosure>
+                )}
                 {msg.search && (msg.search.results || []).length > 0 && (
                   <Disclosure icon={Layers} label="Sources" count={`${msg.search.results.length} documents`}>
                     <SourceList results={msg.search.results} />
@@ -207,7 +227,7 @@ function Composer({ onSend, busy, statusHint }) {
             <span className="kbd">Enter</span> to send · <span className="kbd">Shift+Enter</span> new line
           </span>
           <span className="faint">
-            {busy && statusHint ? statusHint : busy ? 'Nate is responding…' : 'Answers cite firm sources'}
+            {busy && statusHint ? statusHint : busy ? 'Nate\'s AI is responding…' : 'Answers cite firm sources'}
           </span>
         </div>
       </div>
@@ -226,7 +246,7 @@ function buildHistory(messages) {
     .slice(-10);
 }
 
-export default function Chat({ messages, setMessages, busy, setBusy, filters, advanced, user }) {
+export default function Chat({ messages, setMessages, busy, setBusy, settings, user }) {
   const threadRef = useRef(null);
   const lastUserRef = useRef('');
   const [statusHint, setStatusHint] = useState('');
@@ -246,8 +266,16 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
     setMessages((m) => m.map((msg) => (msg.id === aiId ? { ...msg, ...patch } : msg)));
   };
 
+  const { revealAnswer, clearReveal } = useAnswerReveal(patchAi);
+  const isRevealing = messages.some((m) => m.role === 'ai' && m.streaming);
+
+  useEffect(() => {
+    if (messages.length === 0) clearReveal();
+  }, [messages.length, clearReveal]);
+
   const send = async (text, { retryAiId } = {}) => {
-    if (busy) return;
+    if (busy || isRevealing) return;
+    clearReveal();
     lastUserRef.current = text;
 
     const aiId = retryAiId || `a${Date.now()}`;
@@ -285,10 +313,8 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
     const body = {
       question: text,
       chat_history: buildHistory(historySource),
-      ...filterPayload(filters),
+      ...requestSettingsPayload(settings),
     };
-    const sys = advanced?.sys?.trim();
-    if (sys) body.system_prompt = sys;
 
     try {
       await chatStream(body, {
@@ -304,28 +330,12 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
           setStatusHint(`Retrying (${attempt}/${maxRetries})…`);
         },
         onStatus: (phase) => {
-          patchAi(aiId, { status: phase });
+          patchAi(aiId, { status: phase, answer: '' });
           setStatusHint(statusLabel(phase));
         },
-        onToken: (chunk) => {
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === aiId
-                ? { ...msg, answer: (msg.answer || '') + chunk, status: 'generating', error: false }
-                : msg
-            )
-          );
-          setStatusHint(statusLabel('generating'));
-        },
         onDone: (data) => {
-          patchAi(aiId, {
-            answer: data.answer || '',
-            search: data.search,
-            timing: data.timing,
-            streaming: false,
-            status: null,
-            error: false,
-          });
+          setStatusHint('');
+          revealAnswer(aiId, data);
         },
       });
     } catch (err) {
@@ -347,7 +357,8 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
   };
 
   const regenerate = () => {
-    if (!lastUserRef.current || busy) return;
+    if (!lastUserRef.current || busy || isRevealing) return;
+    clearReveal();
     setMessages((m) => (m[m.length - 1]?.role === 'ai' ? m.slice(0, -1) : m));
     send(lastUserRef.current);
   };
@@ -380,7 +391,7 @@ export default function Chat({ messages, setMessages, busy, setBusy, filters, ad
           </div>
         )}
       </div>
-      <Composer onSend={send} busy={busy} statusHint={statusHint} />
+      <Composer onSend={send} busy={busy || isRevealing} statusHint={statusHint} />
     </div>
   );
 }
