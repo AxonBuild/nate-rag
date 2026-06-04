@@ -613,6 +613,11 @@ input, textarea, select { font-family: inherit; }
 }
 .invite-email { flex: 1; font-size: 14px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
+.invite-signup-form { width: 100%; text-align: left; }
+.invite-name-row { display: flex; gap: 10px; }
+.invite-name-row .login-field { flex: 1; min-width: 0; }
+.invite-signup-form .login-btn { margin-top: 8px; }
+
 /* ============================================================
    ANIMATIONS
    ============================================================ */
