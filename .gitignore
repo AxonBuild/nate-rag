@@ -1,3 +1,6 @@
+# SQLite chat DB (droplet / local)
+data/
+
 # Environment and secrets
 .env
 .env.*
