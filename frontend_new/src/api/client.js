@@ -1,0 +1,42 @@
+const BASE = import.meta.env.VITE_API_URL || '';
+
+let getAuthToken = null;
+
+/** Register Clerk getToken so API calls can send Bearer auth (for when backend enforces it). */
+export function setAuthTokenGetter(fn) {
+  getAuthToken = fn;
+}
+
+async function request(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (getAuthToken) {
+    const token = await getAuthToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(BASE + path, { ...options, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    const d = err.detail;
+    const msg = Array.isArray(d)
+      ? d.map((x) => x.msg || x.message || String(x)).join(', ')
+      : (typeof d === 'string' ? d : d?.message) || res.statusText;
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+const json = (body) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+export const api = {
+  chat:   (body) => request('/chat/',   json(body)),
+  search: (body) => request('/search/', json(body)),
+  stats:  ()     => request('/stats/'),
+  config: ()     => request('/config/'),
+  inviteUser: (body) => request('/admin/invitations', json(body)),
+  listInvitations: () => request('/admin/invitations'),
+};
