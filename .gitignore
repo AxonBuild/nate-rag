@@ -1,0 +1,88 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local agent / tooling
+.claude/
+
+# Pipeline outputs and large/generated data
+qa_output/
+Fireflies Data-Transcriptions/
+fireflies_transcripts/
+TD Chats/
+*.zip
+*.bak
+
+# Generated reports and dumps
+*_raw.txt
+*_output.txt
+*_dump.txt
+*_analysis.txt
+*_matches.txt
+analytics_report.txt
+email_crossmatch.txt
+collect_senders_output.txt
+full_context_dump.txt
+joint_attendee_matches.txt
+people_by_initials.txt
+people_involved.txt
+unmatched_*.txt
+transcript_mapping.txt
+transcript_mapping_review.csv
+
+llm_pipeline/
+logs/
+transcript_pipeline/logs/
+tom-orent-RAG/
+parsed_chat
+parsed_chats/
+parsed_transcripts/
+parsed_transcripts_qa/
+parsed_transcripts_qa_verified/
+missing_knowledge/
+cursor-claude-manual-qa
+firm_knowledge_base/
+chat_parsing
+KB_SKIPPED
+qa_output_v2/
+raw_docs
+KB_REUSE
+KB_TO_PROCESS
+qa_evaluation_results
+transcript_output
+transcript-chats-mapping
+transcript_pipeline
+
+node_modules/

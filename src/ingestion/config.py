@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     retrieval_min_score_final: float = 0.4
     use_keyword_search_level2: bool = True
 
+    # Clerk (auth + admin invites)
+    clerk_secret_key: Optional[str] = None
+    clerk_publishable_key: Optional[str] = None
+    clerk_issuer: Optional[str] = None
+    clerk_invite_redirect_url: str = "http://localhost:5173"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

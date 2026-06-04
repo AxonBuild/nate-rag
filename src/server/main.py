@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from src.ingestion.config import settings
 from src.ingestion.qdrant_client import QdrantClient
 from src.server.dependencies import get_qdrant_client
-from src.server.routes import chat, search
+from src.server.routes import admin, chat, search
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +33,7 @@ app.add_middleware(
 
 app.include_router(chat.router)
 app.include_router(search.router)
+app.include_router(admin.router)
 
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
