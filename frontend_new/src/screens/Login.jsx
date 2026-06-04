@@ -1,6 +1,8 @@
-import { SignIn } from '@clerk/clerk-react';
+import { useMemo } from 'react';
+import { SignIn, SignUp } from '@clerk/clerk-react';
 import { Sun, Moon, Check } from 'lucide-react';
 import LogoMark from '../components/LogoMark.jsx';
+import { hasInviteTicket } from '../utils/clerkInvite.js';
 
 const clerkAppearance = {
   variables: {
@@ -58,6 +60,8 @@ const clerkAppearance = {
 };
 
 export default function Login({ theme, toggleTheme }) {
+  const isInvite = useMemo(() => hasInviteTicket(), []);
+
   return (
     <div className="login-root">
       <svg className="login-aurora" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
@@ -82,11 +86,20 @@ export default function Login({ theme, toggleTheme }) {
 
       <div className="login-card fade-in">
         <div className="login-mark"><LogoMark size={54} /></div>
-        <h1>Welcome to Nate AI</h1>
-        <p className="login-tag">Your AI-powered tax &amp; real estate advisor</p>
+        <h1>{isInvite ? 'Accept your invitation' : 'Welcome to Nate AI'}</h1>
+        <p className="login-tag">
+          {isInvite
+            ? 'Create your password to join Meeker CPA\u2019s Nate AI workspace.'
+            : 'Your AI-powered tax & real estate advisor'}
+        </p>
 
         <div className="clerk-signin-wrap">
-          <SignIn routing="hash" appearance={clerkAppearance} />
+          {isInvite ? (
+            /* Invites must use SignUp + __clerk_ticket — SignIn causes "non-existing identification" */
+            <SignUp appearance={clerkAppearance} />
+          ) : (
+            <SignIn routing="hash" appearance={clerkAppearance} />
+          )}
         </div>
 
         <div className="login-foot">
