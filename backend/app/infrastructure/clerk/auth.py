@@ -58,6 +58,10 @@ def decode_session_token(token: str) -> dict[str, Any]:
             key.key,
             algorithms=["RS256"],
             issuer=issuer,
+            # Allow small clock skew (common during rapid account switching / Windows time drift).
+            # Without this, we can intermittently see "The token is not yet valid (iat)" for a
+            # newly-issued Clerk session token.
+            leeway=60,
             options={"verify_aud": False},
         )
     except jwt.PyJWTError as e:
