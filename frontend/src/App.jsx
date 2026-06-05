@@ -7,6 +7,7 @@ import Search from './screens/Search.jsx';
 import Invites from './screens/Invites.jsx';
 import Retrieval from './screens/Retrieval.jsx';
 import SystemPrompt from './screens/SystemPrompt.jsx';
+import Ingest from './screens/Ingest.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
@@ -24,6 +25,7 @@ const TITLES = {
   retrieval: { title: 'Retrieval', crumb: 'Settings' },
   prompt: { title: 'System prompt', crumb: 'Settings' },
   invites: { title: 'Invitations', crumb: 'Admin' },
+  ingest: { title: 'Ingest', crumb: 'Knowledge Base' },
 };
 
 function clerkDisplayUser(user) {
@@ -264,6 +266,8 @@ function AppShell({ user, onLogout, isAdmin }) {
     screen = <Retrieval settings={settings} setSettings={setSettings} />;
   } else if (view === 'prompt') {
     screen = <SystemPrompt setSettings={setSettings} />;
+  } else if (view === 'ingest') {
+    screen = <Ingest />;
   } else if (view === 'invites' && isAdmin) {
     screen = <Invites />;
   } else {

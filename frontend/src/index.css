@@ -803,6 +803,88 @@ input, textarea, select { font-family: inherit; }
 /* ============================================================
    SETTINGS (RETRIEVAL / SYSTEM PROMPT)
    ============================================================ */
+.ingest-tabs { margin-bottom: 16px; flex-wrap: wrap; }
+.ingest-panel { max-width: 640px; }
+.ingest-panel .panel-sub { margin-top: -8px; }
+.ingest-columns {
+  display: grid;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
+.ingest-select {
+  width: 100%;
+  cursor: pointer;
+}
+.ingest-file-field { margin-bottom: 18px; }
+.ingest-file-field label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ingest-required {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+}
+.ingest-file-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.ingest-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.ingest-file-ico { color: var(--accent); flex-shrink: 0; }
+.ingest-file-row input[type="file"] {
+  font-size: 12.5px;
+  max-width: 100%;
+}
+.ingest-file-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ingest-meta-id {
+  margin: 0 0 16px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.ingest-meta-id code {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-3);
+}
+.ingest-error {
+  margin-top: 14px;
+  color: #e05a5a;
+  font-size: 14px;
+}
+.ingest-result {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.ingest-result-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
 .settings-panel { margin-top: 8px; max-width: 100%; width: 100%; }
 .settings-panel-head {
   display: flex; align-items: center; gap: 10px;

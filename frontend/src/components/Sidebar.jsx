@@ -8,6 +8,7 @@ import {
   FileText,
   Plus,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import LogoMark from './LogoMark.jsx';
 
@@ -43,6 +44,7 @@ export default function Sidebar({
   const nav = [
     { id: 'chat', icon: MessageSquare, label: 'Chat' },
     { id: 'search', icon: Search, label: 'Search' },
+    { id: 'ingest', icon: Upload, label: 'Ingest' },
     { id: 'retrieval', icon: SlidersHorizontal, label: 'Retrieval' },
     { id: 'prompt', icon: FileText, label: 'System prompt' },
     ...(isAdmin ? [{ id: 'invites', icon: UserPlus, label: 'Invitations' }] : []),
