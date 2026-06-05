@@ -5,6 +5,15 @@ from backend.app.services.rag.prompts.defaults import get_default_system_prompt
 
 
 class UserSettingsService:
+    """
+    Shared (global) settings for the whole app.
+
+    Note: We currently store the shared prompt in `user_preferences` under a
+    fixed synthetic key to avoid a migration.
+    """
+
+    GLOBAL_PROMPT_KEY = "__global__"
+
     def __init__(self, repo: UserPreferenceRepository | None = None):
         self._repo = repo or UserPreferenceRepository()
 
@@ -13,7 +22,8 @@ class UserSettingsService:
 
     async def get_system_prompt(self, session: AsyncSession, clerk_user_id: str) -> dict:
         default = self.default_system_prompt()
-        row = await self._repo.get(session, clerk_user_id)
+        # Shared prompt (same for all users)
+        row = await self._repo.get(session, self.GLOBAL_PROMPT_KEY)
         custom = (row.system_prompt.strip() if row and row.system_prompt else None) or None
         is_custom = bool(custom and custom != default.strip())
         effective = custom if is_custom else default
@@ -30,5 +40,6 @@ class UserSettingsService:
         default = self.default_system_prompt()
         text = system_prompt.strip()
         to_store = None if not text or text == default.strip() else text
-        await self._repo.upsert_system_prompt(session, clerk_user_id, to_store)
+        # Shared prompt (same for all users)
+        await self._repo.upsert_system_prompt(session, self.GLOBAL_PROMPT_KEY, to_store)
         return await self.get_system_prompt(session, clerk_user_id)

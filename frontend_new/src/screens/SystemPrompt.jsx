@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileText, GitCompare, Pencil, RotateCcw, Save } from 'lucide-react';
 import { api } from '../api/client.js';
 import PromptDiffView from '../components/PromptDiffView.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { toUserFacingMessage } from '../utils/userFacingError.js';
 
 function syncSettingsFromResponse(setSettings, data) {
@@ -21,6 +22,7 @@ export default function SystemPrompt({ setSettings }) {
   const [savedAt, setSavedAt] = useState(null);
   const [baseline, setBaseline] = useState('');
   const [viewMode, setViewMode] = useState('edit');
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +95,7 @@ export default function SystemPrompt({ setSettings }) {
         <h1 className="page-h">System prompt</h1>
         <p className="page-sub">
           This is the instruction Nate&apos;s AI uses when writing chat answers. Compare your
-          edits to the built-in default before saving.
+          edits to the built-in default before saving. This prompt is shared across all users.
         </p>
 
         <div className="panel settings-panel">
@@ -148,7 +150,7 @@ export default function SystemPrompt({ setSettings }) {
                   oldText={defaultPrompt}
                   newText={draft}
                   oldLabel="Default"
-                  newLabel="Your draft"
+                  newLabel="Draft"
                 />
               )}
 
@@ -169,7 +171,7 @@ export default function SystemPrompt({ setSettings }) {
                   <button
                     type="button"
                     className="icon-btn bordered"
-                    onClick={resetToDefault}
+                    onClick={() => setResetConfirmOpen(true)}
                     disabled={saving || (!isCustom && !differsFromDefault)}
                     title="Restore default prompt"
                   >
@@ -190,6 +192,23 @@ export default function SystemPrompt({ setSettings }) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title="Reset shared prompt to default?"
+        message="This will overwrite the shared system prompt for everyone. You can’t undo this automatically."
+        confirmLabel="Reset"
+        cancelLabel="Cancel"
+        busy={saving}
+        onCancel={() => {
+          if (!saving) setResetConfirmOpen(false);
+        }}
+        onConfirm={async () => {
+          if (saving) return;
+          setResetConfirmOpen(false);
+          await resetToDefault();
+        }}
+      />
     </div>
   );
 }
