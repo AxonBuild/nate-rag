@@ -4,6 +4,7 @@ import { api } from '../api/client.js';
 import PromptDiffView from '../components/PromptDiffView.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { toUserFacingMessage } from '../utils/userFacingError.js';
+import { useAppRole } from '../hooks/useAppRole.js';
 
 function syncSettingsFromResponse(setSettings, data) {
   setSettings((s) => ({
@@ -13,6 +14,7 @@ function syncSettingsFromResponse(setSettings, data) {
 }
 
 export default function SystemPrompt({ setSettings }) {
+  const { isAdmin } = useAppRole();
   const [draft, setDraft] = useState('');
   const [defaultPrompt, setDefaultPrompt] = useState('');
   const [isCustom, setIsCustom] = useState(false);
@@ -143,7 +145,8 @@ export default function SystemPrompt({ setSettings }) {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   rows={22}
-                  disabled={saving}
+                  disabled={saving || !isAdmin}
+                  readOnly={!isAdmin}
                 />
               ) : (
                 <PromptDiffView
@@ -158,32 +161,38 @@ export default function SystemPrompt({ setSettings }) {
                 <p style={{ color: '#e05a5a', fontSize: 13, marginTop: 8 }}>{error}</p>
               )}
               <div className="settings-actions">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="btn-primary-sm"
-                    onClick={save}
-                    disabled={saving || !dirty}
-                  >
-                    <Save size={15} />
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn bordered"
-                    onClick={() => setResetConfirmOpen(true)}
-                    disabled={saving || (!isCustom && !differsFromDefault)}
-                    title="Restore default prompt"
-                  >
-                    <RotateCcw size={15} />
-                    Reset to default
-                  </button>
-                </div>
+                {isAdmin ? (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn-primary-sm"
+                      onClick={save}
+                      disabled={saving || !dirty}
+                    >
+                      <Save size={15} />
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn bordered"
+                      onClick={() => setResetConfirmOpen(true)}
+                      disabled={saving || (!isCustom && !differsFromDefault)}
+                      title="Restore default prompt"
+                    >
+                      <RotateCcw size={15} />
+                      Reset to default
+                    </button>
+                  </div>
+                ) : (
+                  <span className="faint" style={{ fontSize: 13 }}>
+                    Only admins can edit the system prompt.
+                  </span>
+                )}
                 <span className="faint" style={{ fontSize: 12 }}>
                   {draft.trim().length} characters
-                  {savedAt && !dirty
+                  {isAdmin && savedAt && !dirty
                     ? ` · Saved ${savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : dirty
+                    : isAdmin && dirty
                       ? ' · Unsaved changes'
                       : ''}
                 </span>

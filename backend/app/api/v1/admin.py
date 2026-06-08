@@ -33,3 +33,20 @@ async def list_invitations(
     controller: AdminController = Depends(get_admin_controller),
 ):
     return await controller.list_invitations(status=status)
+
+
+@router.get("/users")
+async def list_users(
+    _admin: dict[str, Any] = Depends(require_admin),
+    controller: AdminController = Depends(get_admin_controller),
+):
+    return await controller.list_users()
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    _admin: dict[str, Any] = Depends(require_admin),
+    controller: AdminController = Depends(get_admin_controller),
+):
+    return await controller.delete_user(user_id)

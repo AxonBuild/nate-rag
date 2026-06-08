@@ -5,14 +5,16 @@ import LogoMark from '../components/LogoMark.jsx';
 import InviteSignUp from '../components/InviteSignUp.jsx';
 import { hasInviteTicket } from '../utils/clerkInvite.js';
 
-const clerkAppearance = {
+function buildClerkAppearance(theme) {
+  const dark = theme === 'dark';
+  return {
   variables: {
-    colorPrimary: '#C9A84C',
+    colorPrimary: dark ? '#C9A84C' : '#B08A35',
     colorBackground: 'transparent',
-    colorText: '#EAF0F7',
-    colorTextSecondary: '#A9BBCF',
-    colorInputBackground: '#0E1E32',
-    colorInputText: '#EAF0F7',
+    colorText: dark ? '#EAF0F7' : '#0F1C2E',
+    colorTextSecondary: dark ? '#A9BBCF' : '#51637A',
+    colorInputBackground: dark ? '#0E1E32' : '#FFFFFF',
+    colorInputText: dark ? '#EAF0F7' : '#0F1C2E',
     borderRadius: '10px',
     fontSize: '14px',
   },
@@ -59,9 +61,11 @@ const clerkAppearance = {
     identityPreview: { background: 'var(--surface-2)' },
   },
 };
+}
 
 export default function Login({ theme, toggleTheme }) {
   const isInvite = useMemo(() => hasInviteTicket(), []);
+  const clerkAppearance = useMemo(() => buildClerkAppearance(theme), [theme]);
 
   return (
     <div className="login-root">

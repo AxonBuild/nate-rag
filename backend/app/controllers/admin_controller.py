@@ -14,3 +14,9 @@ class AdminController:
 
     async def list_invitations(self, status: Optional[str] = "pending") -> dict[str, Any]:
         return await self._service.list_invitations(status=status)
+
+    async def list_users(self) -> dict[str, Any]:
+        return await self._service.list_users()
+
+    async def delete_user(self, user_id: str) -> dict[str, str]:
+        return await self._service.delete_user(user_id)

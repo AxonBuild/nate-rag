@@ -72,3 +72,53 @@ class AdminService:
                 for inv in items
             ]
         }
+
+    async def list_users(self) -> dict[str, Any]:
+        users: list[dict] = []
+        offset = 0
+        limit = 100
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            while True:
+                res = await client.get(
+                    f"{CLERK_API}/users",
+                    headers=self._headers(),
+                    params={"limit": limit, "offset": offset, "order_by": "-created_at"},
+                )
+                if res.status_code >= 400:
+                    logger.error("Clerk list users failed: %s %s", res.status_code, res.text)
+                    raise HTTPException(status_code=502, detail="Could not load users")
+                batch = res.json()
+                items = batch if isinstance(batch, list) else batch.get("data", [])
+                if not items:
+                    break
+                users.extend(items)
+                if len(items) < limit:
+                    break
+                offset += limit
+        return {
+            "users": [
+                {
+                    "id": u.get("id"),
+                    "first_name": u.get("first_name"),
+                    "last_name": u.get("last_name"),
+                    "email_address": (u.get("email_addresses") or [{}])[0].get("email_address", ""),
+                    "role": (u.get("public_metadata") or {}).get("role", "client"),
+                    "created_at": u.get("created_at"),
+                    "last_sign_in_at": u.get("last_sign_in_at"),
+                }
+                for u in users
+            ]
+        }
+
+    async def delete_user(self, user_id: str) -> dict[str, str]:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            res = await client.delete(
+                f"{CLERK_API}/users/{user_id}",
+                headers=self._headers(),
+            )
+        if res.status_code == 404:
+            raise HTTPException(status_code=404, detail="User not found")
+        if res.status_code >= 400:
+            logger.error("Clerk delete user failed: %s %s", res.status_code, res.text)
+            raise HTTPException(status_code=502, detail="Could not delete user")
+        return {"status": "deleted", "user_id": user_id}

@@ -6,6 +6,7 @@ RUN npm ci
 COPY frontend/ ./
 ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_API_URL=
 RUN npm run build
 
 # ---- Stage 2: production image ----

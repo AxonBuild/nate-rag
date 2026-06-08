@@ -73,6 +73,9 @@ export const api = {
   config: ()     => request('/system/config/'),
   inviteUser: (body) => request('/admin/invitations', json(body)),
   listInvitations: () => request('/admin/invitations'),
+  listUsers: () => request('/admin/users'),
+  deleteUser: (userId) =>
+    request(`/admin/users/${userId}`, { method: 'DELETE' }),
   listConversations: () => request('/conversations'),
   createConversation: (body = {}) =>
     request('/conversations', { method: 'POST', ...json(body) }),
