@@ -2,12 +2,7 @@ from fastapi import APIRouter
 
 from backend.app.config.settings import settings
 
-router = APIRouter(tags=["system"])
-
-
-@router.get("/")
-async def root():
-    return {"message": "Nate's AI API", "docs": "/docs"}
+router = APIRouter(prefix="/system", tags=["system"])
 
 
 @router.get("/health")

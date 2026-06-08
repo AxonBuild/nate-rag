@@ -1,9 +1,12 @@
 """FastAPI application entrypoint."""
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.v1.router import api_router
 from backend.app.config.logging_config import setup_logging
@@ -11,6 +14,8 @@ from backend.app.infrastructure.database.session import init_db
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
 
 @asynccontextmanager
@@ -29,6 +34,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(api_router)
+
+    if STATIC_DIR.is_dir():
+        application.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+        @application.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            file = STATIC_DIR / full_path
+            if file.is_file():
+                return FileResponse(file)
+            return FileResponse(STATIC_DIR / "index.html")
+
     return application
 
 

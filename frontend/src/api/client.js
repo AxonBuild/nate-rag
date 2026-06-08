@@ -70,7 +70,7 @@ const json = (body) => ({
 export const api = {
   chat:   (body) => request('/chat/',   json(body)),
   search: (body) => request('/search/', json(body)),
-  config: ()     => request('/config/'),
+  config: ()     => request('/system/config/'),
   inviteUser: (body) => request('/admin/invitations', json(body)),
   listInvitations: () => request('/admin/invitations'),
   listConversations: () => request('/conversations'),

@@ -106,11 +106,6 @@ export default function Login({ theme, toggleTheme }) {
           Access is by invitation only. Contact your administrator if you need an invite.
         </div>
       </div>
-
-      <div className="clerk-note">
-        <Check size={13} style={{ color: 'var(--accent)' }} />
-        Secured by Clerk
-      </div>
     </div>
   );
 }
