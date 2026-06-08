@@ -1,0 +1,62 @@
+name: nate-rag
+region: nyc
+services:
+  - name: nate-rag
+    image:
+      registry_type: DOCKER_HUB
+      registry: hsn37
+      repository: nate-rag
+      tag: v2
+    http_port: 8000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: OPENAI_API_KEY
+        value: "${OPENAI_API_KEY}"
+        type: SECRET
+      - key: OPENAI_MODEL
+        value: "${OPENAI_MODEL}"
+      - key: OPENAI_REFINEMENT_MODEL
+        value: "${OPENAI_REFINEMENT_MODEL}"
+      - key: OPENAI_VERIFICATION_MODEL
+        value: "${OPENAI_VERIFICATION_MODEL}"
+      - key: OPENAI_BASE_URL
+        value: "${OPENAI_BASE_URL}"
+      - key: OPENAI_EMBEDDING_MODEL
+        value: "${OPENAI_EMBEDDING_MODEL}"
+      - key: QDRANT_URL
+        value: "${QDRANT_URL}"
+      - key: QDRANT_API_KEY
+        value: "${QDRANT_API_KEY}"
+        type: SECRET
+      - key: QDRANT_COLLECTION_NAME
+        value: "${QDRANT_COLLECTION_NAME}"
+      - key: CHUNK_SIZE_PAGE
+        value: "${CHUNK_SIZE_PAGE}"
+      - key: CHUNK_SIZE_PARAGRAPH
+        value: "${CHUNK_SIZE_PARAGRAPH}"
+      - key: CHUNK_SIZE_CONTENT
+        value: "${CHUNK_SIZE_CONTENT}"
+      - key: CHUNK_OVERLAP
+        value: "${CHUNK_OVERLAP}"
+      - key: RETRIEVAL_LIMIT_PAGES
+        value: "${RETRIEVAL_LIMIT_PAGES}"
+      - key: RETRIEVAL_LIMIT_PARAGRAPHS
+        value: "${RETRIEVAL_LIMIT_PARAGRAPHS}"
+      - key: RETRIEVAL_LIMIT_FINAL
+        value: "${RETRIEVAL_LIMIT_FINAL}"
+      - key: RETRIEVAL_PAGE_PREFETCH_LIMIT
+        value: "${RETRIEVAL_PAGE_PREFETCH_LIMIT}"
+      - key: RETRIEVAL_CONTENT_PREFETCH_LIMIT
+        value: "${RETRIEVAL_CONTENT_PREFETCH_LIMIT}"
+      - key: RETRIEVAL_MIN_SCORE_FINAL
+        value: "${RETRIEVAL_MIN_SCORE_FINAL}"
+      - key: USE_KEYWORD_SEARCH_LEVEL2
+        value: "${USE_KEYWORD_SEARCH_LEVEL2}"
+      - key: CLERK_SECRET_KEY
+        value: "${CLERK_SECRET_KEY}"
+        type: SECRET
+      - key: CLERK_PUBLISHABLE_KEY
+        value: "${CLERK_PUBLISHABLE_KEY}"
+      - key: CLERK_INVITE_REDIRECT_URL
+        value: "${CLERK_INVITE_REDIRECT_URL}"
