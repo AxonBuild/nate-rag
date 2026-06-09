@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 _is_sqlite = settings.database_url.startswith("sqlite")
 
-engine = create_async_engine(settings.async_database_url, echo=False)
+_connect_args = {"ssl": "require"} if not _is_sqlite else {}
+_db_url = settings.async_database_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+
+engine = create_async_engine(_db_url, echo=False, connect_args=_connect_args)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
