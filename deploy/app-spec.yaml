@@ -1,0 +1,100 @@
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+ingress:
+  rules:
+  - component:
+      name: nate-rag
+    match:
+      authority: {}
+      path:
+        prefix: /
+name: nate-rag
+region: nyc
+services:
+- dockerfile_path: Dockerfile
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: AxonBuild/nate-rag
+  http_port: 8000
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-1gb-fixed
+  name: nate-rag
+  source_dir: /
+  envs:
+  - key: VITE_CLERK_PUBLISHABLE_KEY
+    scope: BUILD_TIME
+    value: "${CLERK_PUBLISHABLE_KEY}"
+  - key: OPENAI_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: "${OPENAI_API_KEY}"
+  - key: OPENAI_MODEL
+    scope: RUN_TIME
+    value: "${OPENAI_MODEL}"
+  - key: OPENAI_REFINEMENT_MODEL
+    scope: RUN_TIME
+    value: "${OPENAI_REFINEMENT_MODEL}"
+  - key: OPENAI_VERIFICATION_MODEL
+    scope: RUN_TIME
+    value: "${OPENAI_VERIFICATION_MODEL}"
+  - key: OPENAI_BASE_URL
+    scope: RUN_TIME
+    value: "${OPENAI_BASE_URL}"
+  - key: OPENAI_EMBEDDING_MODEL
+    scope: RUN_TIME
+    value: "${OPENAI_EMBEDDING_MODEL}"
+  - key: QDRANT_URL
+    scope: RUN_TIME
+    value: "${QDRANT_URL}"
+  - key: QDRANT_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: "${QDRANT_API_KEY}"
+  - key: QDRANT_COLLECTION_NAME
+    scope: RUN_TIME
+    value: "${QDRANT_COLLECTION_NAME}"
+  - key: CHUNK_SIZE_PAGE
+    scope: RUN_TIME
+    value: "${CHUNK_SIZE_PAGE}"
+  - key: CHUNK_SIZE_PARAGRAPH
+    scope: RUN_TIME
+    value: "${CHUNK_SIZE_PARAGRAPH}"
+  - key: CHUNK_SIZE_CONTENT
+    scope: RUN_TIME
+    value: "${CHUNK_SIZE_CONTENT}"
+  - key: CHUNK_OVERLAP
+    scope: RUN_TIME
+    value: "${CHUNK_OVERLAP}"
+  - key: RETRIEVAL_LIMIT_PAGES
+    scope: RUN_TIME
+    value: "${RETRIEVAL_LIMIT_PAGES}"
+  - key: RETRIEVAL_LIMIT_PARAGRAPHS
+    scope: RUN_TIME
+    value: "${RETRIEVAL_LIMIT_PARAGRAPHS}"
+  - key: RETRIEVAL_LIMIT_FINAL
+    scope: RUN_TIME
+    value: "${RETRIEVAL_LIMIT_FINAL}"
+  - key: RETRIEVAL_PAGE_PREFETCH_LIMIT
+    scope: RUN_TIME
+    value: "${RETRIEVAL_PAGE_PREFETCH_LIMIT}"
+  - key: RETRIEVAL_CONTENT_PREFETCH_LIMIT
+    scope: RUN_TIME
+    value: "${RETRIEVAL_CONTENT_PREFETCH_LIMIT}"
+  - key: RETRIEVAL_MIN_SCORE_FINAL
+    scope: RUN_TIME
+    value: "${RETRIEVAL_MIN_SCORE_FINAL}"
+  - key: USE_KEYWORD_SEARCH_LEVEL2
+    scope: RUN_TIME
+    value: "${USE_KEYWORD_SEARCH_LEVEL2}"
+  - key: CLERK_SECRET_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: "${CLERK_SECRET_KEY}"
+  - key: CLERK_PUBLISHABLE_KEY
+    scope: RUN_TIME
+    value: "${CLERK_PUBLISHABLE_KEY}"
+  - key: CLERK_INVITE_REDIRECT_URL
+    scope: RUN_TIME
+    value: "${CLERK_INVITE_REDIRECT_URL}"
