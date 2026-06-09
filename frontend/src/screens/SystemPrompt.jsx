@@ -51,7 +51,7 @@ export default function SystemPrompt({ setSettings }) {
   }, []);
 
   const dirty = !loading && draft.trim() !== baseline.trim();
-  const differsFromDefault = !loading && draft.trim() !== defaultPrompt.trim();
+  const differsFromDefault = !loading && draft.trim() !== baseline.trim();
 
   const save = async () => {
     setSaving(true);
@@ -150,9 +150,9 @@ export default function SystemPrompt({ setSettings }) {
                 />
               ) : (
                 <PromptDiffView
-                  oldText={defaultPrompt}
+                  oldText={baseline}
                   newText={draft}
-                  oldLabel="Default"
+                  oldLabel="Saved"
                   newLabel="Draft"
                 />
               )}
