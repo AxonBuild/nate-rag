@@ -1,1 +1,0 @@
-"""Nate RAG ingestion pipeline."""
