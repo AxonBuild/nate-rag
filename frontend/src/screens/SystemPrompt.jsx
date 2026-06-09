@@ -172,16 +172,7 @@ export default function SystemPrompt({ setSettings }) {
                       <Save size={15} />
                       {saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button
-                      type="button"
-                      className="icon-btn bordered"
-                      onClick={() => setResetConfirmOpen(true)}
-                      disabled={saving || (!isCustom && !differsFromDefault)}
-                      title="Restore default prompt"
-                    >
-                      <RotateCcw size={15} />
-                      Reset to default
-                    </button>
+                    {/* Restore default prompt button hidden */}
                   </div>
                 ) : (
                   <span className="faint" style={{ fontSize: 13 }}>
