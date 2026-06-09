@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 _is_sqlite = settings.database_url.startswith("sqlite")
 
-engine = create_async_engine(settings.database_url, echo=False)
+engine = create_async_engine(settings.async_database_url, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
