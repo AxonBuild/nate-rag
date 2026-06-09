@@ -1,4 +1,4 @@
-"""SQLite models for chat persistence."""
+"""ORM models for chat persistence."""
 import uuid
 from datetime import datetime, timezone
 

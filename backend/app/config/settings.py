@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-large"
     enable_answer_verification: bool = True
 
-    # Chat persistence (SQLite on droplet)
+    # Chat persistence
     database_url: str = "sqlite+aiosqlite:///./data/nate.db"
 
     @computed_field

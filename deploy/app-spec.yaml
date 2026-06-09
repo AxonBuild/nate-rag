@@ -98,3 +98,7 @@ services:
   - key: CLERK_INVITE_REDIRECT_URL
     scope: RUN_TIME
     value: "${CLERK_INVITE_REDIRECT_URL}"
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    type: SECRET
+    value: "${DATABASE_URL}"

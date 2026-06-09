@@ -10,21 +10,22 @@ from backend.app.models.orm import Base
 
 logger = logging.getLogger(__name__)
 
+_is_sqlite = settings.database_url.startswith("sqlite")
+
 engine = create_async_engine(settings.database_url, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 def _ensure_sqlite_dir() -> None:
-    url = settings.database_url
-    if url.startswith("sqlite"):
-        path_part = url.split("///")[-1]
+    if _is_sqlite:
+        path_part = settings.database_url.split("///")[-1]
         if path_part and path_part != ":memory:":
             Path(path_part).parent.mkdir(parents=True, exist_ok=True)
 
 
-@event.listens_for(engine.sync_engine, "connect")
-def _sqlite_pragma(dbapi_conn, _connection_record):
-    if settings.database_url.startswith("sqlite"):
+if _is_sqlite:
+    @event.listens_for(engine.sync_engine, "connect")
+    def _sqlite_pragma(dbapi_conn, _connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
@@ -32,10 +33,11 @@ def _sqlite_pragma(dbapi_conn, _connection_record):
 
 
 async def init_db() -> None:
-    _ensure_sqlite_dir()
+    if _is_sqlite:
+        _ensure_sqlite_dir()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database ready: %s", settings.database_url.split("///")[-1])
+    logger.info("Database ready: %s", settings.database_url.split("://")[0])
 
 
 async def get_db_session():
