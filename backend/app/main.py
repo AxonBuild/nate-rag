@@ -1,4 +1,5 @@
 """FastAPI application entrypoint."""
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.v1.router import api_router
 from backend.app.config.logging_config import setup_logging
+from backend.app.dependencies.container import get_qdrant_client
 from backend.app.infrastructure.database.session import init_db
 
 setup_logging()
@@ -17,11 +19,26 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 
+QDRANT_HEARTBEAT_INTERVAL = 3600
+
+
+async def _qdrant_heartbeat() -> None:
+    client = get_qdrant_client()
+    while True:
+        await asyncio.sleep(QDRANT_HEARTBEAT_INTERVAL)
+        try:
+            await asyncio.to_thread(client.client.get_collections)
+            logger.info("Qdrant heartbeat OK")
+        except Exception as e:
+            logger.warning(f"Qdrant heartbeat failed: {e}")
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
+    heartbeat_task = asyncio.create_task(_qdrant_heartbeat())
     yield
+    heartbeat_task.cancel()
 
 
 def create_app() -> FastAPI:
