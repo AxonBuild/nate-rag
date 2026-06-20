@@ -47,6 +47,27 @@ class HierarchicalChunker:
         content_chunks = self._create_content_chunks(paragraph_chunks, document_id, topic, doc_type)
         return page_chunks + paragraph_chunks + content_chunks
 
+    def iter_page_groups(
+        self,
+        document: Document,
+        document_id: str,
+        topic: str | None = None,
+        doc_type: str | None = None,
+    ):
+        """Yield one page at a time: a page (L0) chunk plus its paragraph (L1) and content
+        (L2) descendants. Lets a caller embed + upsert each page's points and drop them before
+        the next page, so the whole document's points never sit in memory at once. Per page the
+        output matches ``chunk_document``."""
+        page_chunks = self._create_page_chunks(document, document_id, topic, doc_type)
+        for page_chunk in page_chunks:
+            paragraph_chunks = self._create_paragraph_chunks(
+                [page_chunk], document_id, topic, doc_type
+            )
+            content_chunks = self._create_content_chunks(
+                paragraph_chunks, document_id, topic, doc_type
+            )
+            yield [page_chunk] + paragraph_chunks + content_chunks
+
     def _create_page_chunks(
         self, document: Document, document_id: str, topic: str | None, doc_type: str | None
     ) -> list[tuple[Document, ChunkMetadata]]:

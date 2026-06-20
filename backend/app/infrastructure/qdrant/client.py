@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any
 
 from qdrant_client import QdrantClient as QdrantSyncClient
 from qdrant_client.models import (
-    Distance, VectorParams, PointStruct, Filter, FieldCondition,
+    Distance, VectorParams, PointStruct, Filter, FieldCondition, FilterSelector,
     MatchValue, MatchAny, Prefetch, Fusion, FusionQuery,
     PayloadSchemaType, TextIndexParams, SparseVector, SparseVectorParams, Modifier,
 )
@@ -178,3 +178,31 @@ class QdrantClient:
                 points=points[i:i + batch_size],
             )
         logger.info(f"Upserted {len(points)} chunks to '{self.collection_name}'")
+
+    async def delete_document(self, document_id: str) -> int:
+        """Delete every point belonging to ``document_id``; return how many were removed.
+
+        Used to roll back a partially-ingested document so a failed run leaves no orphan
+        chunks behind. Safe when the collection or document doesn't exist (returns 0).
+        """
+        collections = await asyncio.to_thread(self.client.get_collections)
+        if self.collection_name not in [c.name for c in collections.collections]:
+            return 0
+
+        flt = Filter(
+            must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+        )
+        counted = await asyncio.to_thread(
+            self.client.count,
+            collection_name=self.collection_name,
+            count_filter=flt,
+            exact=True,
+        )
+        if counted.count:
+            await asyncio.to_thread(
+                self.client.delete,
+                collection_name=self.collection_name,
+                points_selector=FilterSelector(filter=flt),
+            )
+        logger.info(f"Deleted {counted.count} chunk(s) for document_id={document_id}")
+        return counted.count

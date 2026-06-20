@@ -48,71 +48,79 @@ class DocumentIngestService:
             doc_type,
         )
 
-        chunked = self._chunker.chunk_document(
-            document,
-            document_id,
-            topic=topic,
-            doc_type=doc_type,
-        )
-
-        if not chunked:
-            logger.warning("[ingest] no chunks for %r", filename)
-            return {
-                "document_id": document_id,
-                "document_name": resolved_name,
-                "character_count": len(document.text),
-                "chunks_created": 0,
-                "chunks_by_level": {},
-                "topic": topic,
-                "doc_type": doc_type,
-            }
-
-        all_texts = [doc.text for doc, _ in chunked]
-        logger.info("[ingest] embedding %d chunks for %r", len(all_texts), filename)
-        content_embeddings = await self._embeddings.generate_embeddings_batch(all_texts)
-
-        text_by_id = {meta.chunk_id: doc.text for doc, meta in chunked}
-        qdrant_chunks: list[dict[str, Any]] = []
-        qdrant_embeddings: list[dict[str, list[float]]] = []
-
-        for (doc, meta), content_emb in zip(chunked, content_embeddings):
-            prev_text = text_by_id.get(meta.prev_chunk) if meta.prev_chunk else None
-            next_text = text_by_id.get(meta.next_chunk) if meta.next_chunk else None
-
-            qdrant_chunks.append(
-                {
-                    "chunk_id": meta.chunk_id,
-                    "level": meta.level,
-                    "document_id": meta.document_id,
-                    "document_name": resolved_name,
-                    "text": doc.text,
-                    "file_type": "normal",
-                    "parent_id": meta.parent_id,
-                    "prev_chunk": prev_text,
-                    "next_chunk": next_text,
-                    "page_number": meta.page_number,
-                    "topic": topic,
-                    "doc_type": doc_type,
-                }
-            )
-            qdrant_embeddings.append({"content": content_emb})
-
-        chunks_created = len(chunked)
-        if ingest_to_qdrant:
-            await self._qdrant.initialize_collection(
-                vector_size=len(content_embeddings[0]),
-            )
-            await self._qdrant.upsert_chunks(qdrant_chunks, qdrant_embeddings)
-
+        # Chunk → embed → upsert one page at a time, releasing each page's points before the
+        # next. Only a single page's chunks + embeddings are ever in memory, not the whole
+        # document's — which is what was blowing up RAM on large PDFs.
         chunks_by_level: dict[int, int] = {}
-        for _, meta in chunked:
-            chunks_by_level[meta.level] = chunks_by_level.get(meta.level, 0) + 1
+        level_2_preview: list[str] = []
+        chunks_created = 0
+        collection_ready = False
 
-        level_2_preview = [
-            c["text"][:300] + ("…" if len(c["text"]) > 300 else "")
-            for c in qdrant_chunks
-            if c["level"] == 2
-        ][:5]
+        # If any page fails (chunking, embedding, or upsert), roll the whole document back so
+        # Qdrant is never left with a partially-uploaded file. All points are keyed by document_id.
+        try:
+            for group in self._chunker.iter_page_groups(
+                document, document_id, topic=topic, doc_type=doc_type
+            ):
+                text_by_id = {meta.chunk_id: doc.text for doc, meta in group}
+                content_embeddings = await self._embeddings.generate_embeddings_batch(
+                    [doc.text for doc, _ in group]
+                )
+
+                if ingest_to_qdrant and not collection_ready:
+                    await self._qdrant.initialize_collection(vector_size=len(content_embeddings[0]))
+                    collection_ready = True
+
+                qdrant_chunks: list[dict[str, Any]] = []
+                qdrant_embeddings: list[dict[str, list[float]]] = []
+                for (doc, meta), content_emb in zip(group, content_embeddings):
+                    qdrant_chunks.append(
+                        {
+                            "chunk_id": meta.chunk_id,
+                            "level": meta.level,
+                            "document_id": meta.document_id,
+                            "document_name": resolved_name,
+                            "text": doc.text,
+                            "file_type": "normal",
+                            "parent_id": meta.parent_id,
+                            "prev_chunk": text_by_id.get(meta.prev_chunk) if meta.prev_chunk else None,
+                            "next_chunk": text_by_id.get(meta.next_chunk) if meta.next_chunk else None,
+                            "page_number": meta.page_number,
+                            "topic": topic,
+                            "doc_type": doc_type,
+                        }
+                    )
+                    qdrant_embeddings.append({"content": content_emb})
+                    chunks_by_level[meta.level] = chunks_by_level.get(meta.level, 0) + 1
+                    if meta.level == 2 and len(level_2_preview) < 5:
+                        t = doc.text
+                        level_2_preview.append(t[:300] + ("…" if len(t) > 300 else ""))
+
+                if ingest_to_qdrant:
+                    await self._qdrant.upsert_chunks(qdrant_chunks, qdrant_embeddings)
+                chunks_created += len(group)
+        except Exception:
+            logger.exception(
+                "[ingest] failed for %r after %d chunk(s); rolling back document_id=%s",
+                filename,
+                chunks_created,
+                document_id,
+            )
+            if ingest_to_qdrant:
+                try:
+                    removed = await self._qdrant.delete_document(document_id)
+                    logger.info("[ingest] rollback removed %d chunk(s) for %r", removed, filename)
+                except Exception:
+                    logger.exception(
+                        "[ingest] ROLLBACK FAILED for document_id=%s — manual cleanup needed",
+                        document_id,
+                    )
+            raise
+
+        if chunks_created == 0:
+            logger.warning("[ingest] no chunks for %r", filename)
+        else:
+            logger.info("[ingest] indexed %d chunks for %r", chunks_created, filename)
 
         return {
             "document_id": document_id,

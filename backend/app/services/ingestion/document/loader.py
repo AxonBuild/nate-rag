@@ -31,6 +31,10 @@ async def _load_pdf(pdf_bytes: bytes, filename: str) -> Document:
                 text = page.extract_text(layout=True, x_tolerance=2, y_tolerance=2)
                 if text:
                     page_texts.append(text)
+                # Drop pdfplumber's per-page parse cache. It otherwise retains every page's
+                # chars/layout objects for the life of the open document, ballooning RAM on
+                # large PDFs. We never re-read the page, so flushing here is safe.
+                page.flush_cache()
 
         combined = _normalize("\n\n".join(page_texts))
         return Document(
