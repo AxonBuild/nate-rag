@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mail, UserPlus, RefreshCw, Users, Trash2 } from 'lucide-react';
+import { Mail, UserPlus, RefreshCw, Users, Trash2, Send } from 'lucide-react';
 import { api } from '../api/client.js';
 import { toUserFacingMessage } from '../utils/userFacingError.js';
 
@@ -22,6 +22,7 @@ export default function Invites() {
   const [error, setError] = useState('');
   const [list, setList] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
+  const [resendingId, setResendingId] = useState(null);
 
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -70,6 +71,24 @@ export default function Invites() {
       setError(toUserFacingMessage(err, 'invites'));
     } finally {
       setSending(false);
+    }
+  };
+
+  const resendInvite = async (inv) => {
+    setResendingId(inv.id);
+    setError('');
+    setMessage('');
+    try {
+      await api.resendInvitation(inv.id, {
+        email: inv.email_address,
+        role: inv.role || 'client',
+      });
+      setMessage(`Invitation resent to ${inv.email_address}`);
+      await loadInvites();
+    } catch (err) {
+      setError(toUserFacingMessage(err, 'invites'));
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -145,6 +164,16 @@ export default function Invites() {
                 <span className="invite-email">{inv.email_address}</span>
                 <span className="pill doc">{displayRole(inv.role || 'client')}</span>
                 <span className="mono faint" style={{ fontSize: 11 }}>{inv.status}</span>
+                <button
+                  type="button"
+                  className="icon-btn bordered"
+                  title="Resend invitation"
+                  onClick={() => resendInvite(inv)}
+                  disabled={resendingId === inv.id}
+                >
+                  <Send size={14} />
+                  {resendingId === inv.id ? 'Sending…' : 'Resend'}
+                </button>
               </li>
             ))}
           </ul>

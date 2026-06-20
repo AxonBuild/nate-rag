@@ -19,6 +19,14 @@ You are the advisor. Never refer to yourself in third person. Do not say "the ad
 
 ---
 
+## Recency
+
+- Each item in the context is labeled with the date its information is from. Tax law, dollar thresholds, contribution limits, and deadlines change from year to year.
+- When two items conflict, follow the one with the most recent date. Treat older figures as superseded — never average them, present both as equally valid, or use an older number when a newer one is present.
+- If the most recent context fully answers the question, you don't need to mention the older version. If a rule recently changed and it affects the client's decision, you may note what changed and roughly when.
+
+---
+
 ## Answer construction
 
 - **Lead with the direct answer.** Never open with a preamble, greeting, or restatement of the question.
@@ -115,9 +123,34 @@ User question: {question}
 """
 
 
+_RECENCY_NOTE = (
+    "Each item below is labeled with the date its information is from "
+    '("Updated" for knowledge-base material, "As of" for past Q&A). '
+    "When two items conflict, rely on the most recent and treat older figures, "
+    "thresholds, and rules as outdated."
+)
+
+
+def _as_of_date(chunk: dict) -> str:
+    """Best available recency date for a chunk, as YYYY-MM-DD.
+
+    Prefers the meeting date (when advice was given, for transcript Q&A), then the
+    ingestion timestamp. Returns "" when the data point predates recency tracking.
+    """
+    raw = chunk.get("meeting_date") or chunk.get("ingested_at") or ""
+    raw = str(raw).strip()
+    # Normalize ISO datetime ("2026-06-20T14:30:00+00:00") down to the date.
+    return raw[:10] if raw else ""
+
+
 def build_context_text(kb_chunks: list, qa_chunks: list) -> str:
-    """Format retrieved chunks into a structured context block for the LLM."""
+    """Format retrieved chunks into a structured context block for the LLM.
+
+    Every item is labeled with its recency date so the model can prefer the most
+    recent source when context conflicts (see _RECENCY_NOTE and the system prompt).
+    """
     parts = []
+    has_dates = False
 
     if kb_chunks:
         parts.append("## Knowledge Base")
@@ -126,10 +159,14 @@ def build_context_text(kb_chunks: list, qa_chunks: list) -> str:
             topic = chunk.get("topic", "")
             prev_text = chunk.get("prev_chunk", "")
             next_text = chunk.get("next_chunk", "")
+            as_of = _as_of_date(chunk)
+            has_dates = has_dates or bool(as_of)
 
             header = f"[{i}] {doc}"
             if topic:
                 header += f" | {topic}"
+            if as_of:
+                header += f" | Updated {as_of}"
 
             lines = [header]
             if prev_text:
@@ -147,14 +184,24 @@ def build_context_text(kb_chunks: list, qa_chunks: list) -> str:
             question = chunk.get("text", "").strip()
             answer = chunk.get("answer", "").strip()
             tags = ", ".join(chunk.get("tags") or [])
+            as_of = _as_of_date(chunk)
+            has_dates = has_dates or bool(as_of)
 
-            lines = [f"[Q{i}]"]
+            header = f"[Q{i}]"
+            if as_of:
+                header += f" (As of {as_of})"
+
+            lines = [header]
             lines.append(f"Q: {question}")
             lines.append(f"A: {answer}")
 
             parts.append("\n".join(lines))
 
-    return "\n\n---\n\n".join(parts)
+    if not parts:
+        return ""
+
+    body = "\n\n---\n\n".join(parts)
+    return f"{_RECENCY_NOTE}\n\n{body}" if has_dates else body
 
 
 def build_user_prompt(context_text: str, question: str) -> str:

@@ -26,6 +26,16 @@ async def create_invitation(
     return await controller.create_invitation(body)
 
 
+@router.post("/invitations/{invitation_id}/resend", response_model=InviteResponseSchema)
+async def resend_invitation(
+    invitation_id: str,
+    body: InviteRequestSchema,
+    _admin: dict[str, Any] = Depends(require_admin),
+    controller: AdminController = Depends(get_admin_controller),
+):
+    return await controller.resend_invitation(invitation_id, body)
+
+
 @router.get("/invitations")
 async def list_invitations(
     status: Optional[str] = "pending",

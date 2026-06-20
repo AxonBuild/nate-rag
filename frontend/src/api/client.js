@@ -72,6 +72,8 @@ export const api = {
   search: (body) => request('/search/', json(body)),
   config: ()     => request('/system/config/'),
   inviteUser: (body) => request('/admin/invitations', json(body)),
+  resendInvitation: (id, body) =>
+    request(`/admin/invitations/${id}/resend`, json(body)),
   listInvitations: () => request('/admin/invitations'),
   listUsers: () => request('/admin/users'),
   deleteUser: (userId) =>

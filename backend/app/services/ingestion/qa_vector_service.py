@@ -1,6 +1,7 @@
 """Upsert QA pairs into Qdrant with question + answer vectors."""
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from qdrant_client.models import PayloadSchemaType, PointStruct, SparseVector
@@ -81,6 +82,11 @@ class QaVectorService:
         question_embeddings = await self._embeddings.generate_embeddings_batch(questions)
         answer_embeddings = await self._embeddings.generate_embeddings_batch(answers)
 
+        # "Last modified" time for this batch. QA pairs from transcripts also carry a
+        # meeting_date (when the advice was actually given), which retrieval prefers;
+        # ingested_at is the fallback recency signal for spreadsheet/chat pairs.
+        ingested_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
         points: list[PointStruct] = []
         for pair, q_emb, a_emb in zip(pairs, question_embeddings, answer_embeddings):
             vector: dict[str, Any] = {
@@ -96,6 +102,7 @@ class QaVectorService:
 
             payload = {k: v for k, v in pair.items() if k not in ("point_id", "chunk_id")}
             payload["chunk_id"] = pair["chunk_id"]
+            payload["ingested_at"] = ingested_at
 
             points.append(
                 PointStruct(

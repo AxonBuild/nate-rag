@@ -47,6 +47,35 @@ class AdminService:
             "role": role,
         }
 
+    async def resend_invitation(
+        self, invitation_id: str, email: str, role: str
+    ) -> dict[str, Any]:
+        """Resend an invitation email.
+
+        Clerk has no native "resend" endpoint, and it rejects a new invitation for an
+        email that already has a pending one (duplicate_record). So we revoke the existing
+        invitation first, then create a fresh one — which sends a new email and invalidates
+        the old (possibly lost) link.
+        """
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            revoke = await client.post(
+                f"{CLERK_API}/invitations/{invitation_id}/revoke",
+                headers=self._headers(),
+            )
+        if revoke.status_code == 404:
+            logger.warning(
+                "Resend: invitation %s not found when revoking; creating a fresh one",
+                invitation_id,
+            )
+        elif revoke.status_code >= 400:
+            logger.error(
+                "Clerk revoke invitation failed: %s %s", revoke.status_code, revoke.text
+            )
+            raise HTTPException(
+                status_code=502, detail="Could not resend the invitation. Please try again."
+            )
+        return await self.create_invitation(email, role)
+
     async def list_invitations(self, status: Optional[str] = "pending") -> dict[str, Any]:
         params = {"status": status} if status else {}
         async with httpx.AsyncClient(timeout=20.0) as client:

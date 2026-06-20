@@ -2,6 +2,7 @@
 import uuid
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from qdrant_client import QdrantClient as QdrantSyncClient
@@ -122,6 +123,10 @@ class QdrantClient:
         model = await self._get_sparse_model()
         points = []
 
+        # When this batch is written — used downstream as the chunk's "last modified"
+        # time so the LLM can prefer the most recent source when context conflicts.
+        ingested_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
         for chunk, embedding in zip(chunks, embeddings):
             level = chunk["level"]
             text = chunk.get("text", "")
@@ -156,6 +161,7 @@ class QdrantClient:
                 # Nate KB fields
                 "topic": chunk.get("topic"),
                 "doc_type": chunk.get("doc_type"),
+                "ingested_at": ingested_at,
             }
 
             points.append(PointStruct(

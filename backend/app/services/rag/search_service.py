@@ -47,6 +47,9 @@ def _format_hits(hits) -> list[dict[str, Any]]:
             "prev_chunk":    _payload(h).get("prev_chunk"),
             "next_chunk":    _payload(h).get("next_chunk"),
             "page_number":   _payload(h).get("page_number"),
+            # Recency signals — when this data point was last ingested / when the advice was given
+            "ingested_at":   _payload(h).get("ingested_at"),
+            "meeting_date":  _payload(h).get("meeting_date"),
             # QA-specific
             "answer":        _payload(h).get("answer"),
             "tags":          _payload(h).get("tags"),
