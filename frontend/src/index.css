@@ -745,9 +745,34 @@ input, textarea, select { font-family: inherit; }
   gap: 10px !important;
   overflow: visible !important;
 }
-.clerk-signin-wrap .cl-formFieldInput {
+.clerk-signin-wrap .cl-formFieldInput:not([type="checkbox"]) {
   min-height: 44px !important;
   padding: 11px 13px !important;
+}
+/* "Sign out of all other devices" — render as a normal small checkbox, not a full input box */
+.clerk-signin-wrap input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  flex: 0 0 auto !important;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.clerk-signin-wrap .cl-formFieldRow__signOutOfOtherSessions {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.clerk-signin-wrap .cl-formFieldRow__signOutOfOtherSessions .cl-formFieldLabel {
+  margin: 0 !important;
+  font-size: 13px !important;
+  color: var(--text-2) !important;
+  cursor: pointer;
 }
 /* Hide duplicate Clerk header (we use our own Welcome text) */
 .clerk-signin-wrap .cl-header,
@@ -794,6 +819,12 @@ input, textarea, select { font-family: inherit; }
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
 }
 .invite-email { flex: 1; font-size: 14px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.invite-row-icon { color: var(--text-3); flex-shrink: 0; }
+.invite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.invite-actions .icon-btn { height: 30px; min-width: 30px; padding: 0 7px; }
+.invite-cancel:hover { background: color-mix(in srgb, #b84a4a 12%, transparent); color: #b84a4a; }
+.spin { animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .invite-signup-form { width: 100%; text-align: left; }
 .invite-name-row { display: flex; gap: 10px; }

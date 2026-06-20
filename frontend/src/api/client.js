@@ -74,6 +74,8 @@ export const api = {
   inviteUser: (body) => request('/admin/invitations', json(body)),
   resendInvitation: (id, body) =>
     request(`/admin/invitations/${id}/resend`, json(body)),
+  cancelInvitation: (id) =>
+    request(`/admin/invitations/${id}`, { method: 'DELETE' }),
   listInvitations: () => request('/admin/invitations'),
   listUsers: () => request('/admin/users'),
   deleteUser: (userId) =>

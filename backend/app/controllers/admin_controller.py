@@ -18,6 +18,9 @@ class AdminController:
         data = await self._service.resend_invitation(invitation_id, body.email, body.role)
         return InviteResponseSchema(**data)
 
+    async def revoke_invitation(self, invitation_id: str) -> dict[str, str]:
+        return await self._service.revoke_invitation(invitation_id)
+
     async def list_invitations(self, status: Optional[str] = "pending") -> dict[str, Any]:
         return await self._service.list_invitations(status=status)
 

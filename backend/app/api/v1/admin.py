@@ -36,6 +36,15 @@ async def resend_invitation(
     return await controller.resend_invitation(invitation_id, body)
 
 
+@router.delete("/invitations/{invitation_id}")
+async def cancel_invitation(
+    invitation_id: str,
+    _admin: dict[str, Any] = Depends(require_admin),
+    controller: AdminController = Depends(get_admin_controller),
+):
+    return await controller.revoke_invitation(invitation_id)
+
+
 @router.get("/invitations")
 async def list_invitations(
     status: Optional[str] = "pending",

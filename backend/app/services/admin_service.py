@@ -76,6 +76,20 @@ class AdminService:
             )
         return await self.create_invitation(email, role)
 
+    async def revoke_invitation(self, invitation_id: str) -> dict[str, str]:
+        """Cancel a pending invitation (Clerk revoke — invalidates its sign-up link)."""
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            res = await client.post(
+                f"{CLERK_API}/invitations/{invitation_id}/revoke",
+                headers=self._headers(),
+            )
+        if res.status_code == 404:
+            raise HTTPException(status_code=404, detail="Invitation not found")
+        if res.status_code >= 400:
+            logger.error("Clerk revoke invitation failed: %s %s", res.status_code, res.text)
+            raise HTTPException(status_code=502, detail="Could not cancel the invitation")
+        return {"status": "revoked", "invitation_id": invitation_id}
+
     async def list_invitations(self, status: Optional[str] = "pending") -> dict[str, Any]:
         params = {"status": status} if status else {}
         async with httpx.AsyncClient(timeout=20.0) as client:

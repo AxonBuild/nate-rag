@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mail, UserPlus, RefreshCw, Users, Trash2, Send } from 'lucide-react';
+import { Mail, UserPlus, RefreshCw, Users, Trash2, Send, X, Loader2 } from 'lucide-react';
 import { api } from '../api/client.js';
 import { toUserFacingMessage } from '../utils/userFacingError.js';
 
@@ -23,6 +23,7 @@ export default function Invites() {
   const [list, setList] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [resendingId, setResendingId] = useState(null);
+  const [cancelingId, setCancelingId] = useState(null);
 
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -89,6 +90,21 @@ export default function Invites() {
       setError(toUserFacingMessage(err, 'invites'));
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const cancelInvite = async (inv) => {
+    setCancelingId(inv.id);
+    setError('');
+    setMessage('');
+    try {
+      await api.cancelInvitation(inv.id);
+      setList((prev) => prev.filter((i) => i.id !== inv.id));
+      setMessage(`Invitation to ${inv.email_address} canceled`);
+    } catch (err) {
+      setError(toUserFacingMessage(err, 'invites'));
+    } finally {
+      setCancelingId(null);
     }
   };
 
@@ -160,20 +176,29 @@ export default function Invites() {
           <ul className="invite-list">
             {list.map((inv) => (
               <li key={inv.id} className="invite-row">
-                <Mail size={15} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                <Mail size={15} className="invite-row-icon" />
                 <span className="invite-email">{inv.email_address}</span>
                 <span className="pill doc">{displayRole(inv.role || 'client')}</span>
-                <span className="mono faint" style={{ fontSize: 11 }}>{inv.status}</span>
-                <button
-                  type="button"
-                  className="icon-btn bordered"
-                  title="Resend invitation"
-                  onClick={() => resendInvite(inv)}
-                  disabled={resendingId === inv.id}
-                >
-                  <Send size={14} />
-                  {resendingId === inv.id ? 'Sending…' : 'Resend'}
-                </button>
+                <div className="invite-actions">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Resend invitation"
+                    onClick={() => resendInvite(inv)}
+                    disabled={resendingId === inv.id || cancelingId === inv.id}
+                  >
+                    {resendingId === inv.id ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn invite-cancel"
+                    title="Cancel invitation"
+                    onClick={() => cancelInvite(inv)}
+                    disabled={resendingId === inv.id || cancelingId === inv.id}
+                  >
+                    {cancelingId === inv.id ? <Loader2 size={15} className="spin" /> : <X size={15} />}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
