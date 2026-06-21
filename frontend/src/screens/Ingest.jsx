@@ -4,7 +4,10 @@ import {
   FileSpreadsheet,
   FileText,
   FileType,
+  Loader2,
   Mic,
+  RefreshCw,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { api } from '../api/client.js';
@@ -316,6 +319,25 @@ function QaTab({ busy, setBusy, setError }) {
 function DocumentTab({ busy, setBusy, setError }) {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
+  const [docs, setDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const loadDocs = async () => {
+    setLoadingDocs(true);
+    try {
+      setDocs(await api.listDocuments());
+    } catch (e) {
+      setError(toUserFacingMessage(e, 'generic'));
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSubmit = Boolean(file && !busy);
 
@@ -327,11 +349,34 @@ function DocumentTab({ busy, setBusy, setError }) {
     try {
       const form = new FormData();
       form.append('file', file);
-      setResult(await api.ingestDocument(form));
+      const res = await api.ingestDocument(form);
+      setResult(res);
+      setFile(null);
+      loadDocs();
     } catch (e) {
       setError(toUserFacingMessage(e, 'generic'));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const removeDoc = async (doc) => {
+    if (
+      !window.confirm(
+        `Delete "${doc.document_name}" and all ${doc.chunk_count} chunks? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(doc.document_id);
+    setError('');
+    try {
+      await api.deleteDocument(doc.document_id);
+      setDocs((prev) => prev.filter((d) => d.document_id !== doc.document_id));
+    } catch (e) {
+      setError(toUserFacingMessage(e, 'generic'));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -377,6 +422,62 @@ function DocumentTab({ busy, setBusy, setError }) {
           </ul>
         </div>
       ) : null}
+
+      <div className="doc-list-wrap">
+        <div className="doc-list-head">
+          <h2 className="panel-h">
+            Indexed documents{docs.length ? ` (${docs.length})` : ''}
+          </h2>
+          <button
+            type="button"
+            className="doc-refresh"
+            onClick={loadDocs}
+            disabled={loadingDocs}
+            title="Refresh list"
+            aria-label="Refresh list"
+          >
+            <RefreshCw size={14} className={loadingDocs ? 'spin' : ''} />
+          </button>
+        </div>
+
+        {loadingDocs && !docs.length ? (
+          <p className="ingest-file-hint">Loading…</p>
+        ) : docs.length === 0 ? (
+          <p className="ingest-file-hint">No documents indexed yet.</p>
+        ) : (
+          <ul className="doc-list">
+            {docs.map((d) => (
+              <li key={d.document_id} className="doc-row">
+                <FileType size={16} className="doc-ico" aria-hidden />
+                <div className="doc-info">
+                  <span className="doc-name" title={d.document_name}>
+                    {d.document_name}
+                  </span>
+                  <span className="doc-meta muted">
+                    {d.chunk_count} chunks
+                    {d.doc_type ? ` · ${d.doc_type}` : ''}
+                    {d.ingested_at ? ` · ${d.ingested_at.slice(0, 10)}` : ''}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="doc-delete"
+                  onClick={() => removeDoc(d)}
+                  disabled={deletingId === d.document_id}
+                  title="Delete document"
+                  aria-label={`Delete ${d.document_name}`}
+                >
+                  {deletingId === d.document_id ? (
+                    <Loader2 size={15} className="spin" />
+                  ) : (
+                    <Trash2 size={15} />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </>
   );
 }

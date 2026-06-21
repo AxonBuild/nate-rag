@@ -1201,3 +1201,37 @@ input, textarea, select { font-family: inherit; }
   .suggest-grid, .query-boxes, .two-col { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ============================================================
+   INGEST — INDEXED DOCUMENTS LIST
+   ============================================================ */
+.doc-list-wrap { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+.doc-list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.doc-refresh {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 7px;
+  color: var(--text-2); border: 1px solid var(--border);
+  transition: color .15s, border-color .15s;
+}
+.doc-refresh:hover:not(:disabled) { color: var(--accent); border-color: var(--border-strong); }
+.doc-refresh:disabled { opacity: .5; cursor: default; }
+
+.doc-list { display: flex; flex-direction: column; gap: 6px; }
+.doc-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: 9px;
+  border: 1px solid var(--border);
+  transition: border-color .15s;
+}
+.doc-row:hover { border-color: var(--border-strong); }
+.doc-ico { color: var(--accent); flex: none; }
+.doc-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.doc-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-meta { font-size: 11.5px; }
+.doc-delete {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 7px; flex: none;
+  color: var(--text-2); transition: color .15s, background .15s;
+}
+.doc-delete:hover:not(:disabled) { color: #e5484d; background: color-mix(in srgb, #e5484d 12%, transparent); }
+.doc-delete:disabled { opacity: .6; cursor: default; }

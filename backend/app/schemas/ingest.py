@@ -60,6 +60,20 @@ class DocumentIngestResponse(BaseModel):
     )
 
 
+class DocumentListItem(BaseModel):
+    document_id: str
+    document_name: str
+    chunk_count: int
+    doc_type: str | None = None
+    topic: str | None = None
+    ingested_at: str | None = None
+
+
+class DeleteDocumentResponse(BaseModel):
+    document_id: str
+    deleted_chunks: int
+
+
 class QaColumnsPreviewResponse(BaseModel):
     columns: list[str]
 

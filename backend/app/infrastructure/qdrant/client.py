@@ -206,3 +206,55 @@ class QdrantClient:
             )
         logger.info(f"Deleted {counted.count} chunk(s) for document_id={document_id}")
         return counted.count
+
+    async def list_documents(self) -> List[Dict[str, Any]]:
+        """List ingested KB documents (file_type='normal') grouped by document_id.
+
+        Scrolls the collection (payload only, no vectors) and aggregates per document:
+        chunk count, name, type/topic, and the most-recent ingested_at. Safe when the
+        collection doesn't exist (returns []).
+        """
+        collections = await asyncio.to_thread(self.client.get_collections)
+        if self.collection_name not in [c.name for c in collections.collections]:
+            return []
+
+        flt = Filter(
+            must=[FieldCondition(key="file_type", match=MatchValue(value="normal"))]
+        )
+        groups: Dict[str, Dict[str, Any]] = {}
+        offset = None
+        while True:
+            points, offset = await asyncio.to_thread(
+                self.client.scroll,
+                collection_name=self.collection_name,
+                scroll_filter=flt,
+                with_payload=["document_id", "document_name", "doc_type", "topic", "ingested_at"],
+                with_vectors=False,
+                limit=256,
+                offset=offset,
+            )
+            for p in points:
+                payload = p.payload or {}
+                did = payload.get("document_id")
+                if not did:
+                    continue
+                g = groups.get(did)
+                if g is None:
+                    g = groups[did] = {
+                        "document_id": did,
+                        "document_name": payload.get("document_name") or did,
+                        "doc_type": payload.get("doc_type"),
+                        "topic": payload.get("topic"),
+                        "ingested_at": payload.get("ingested_at"),
+                        "chunk_count": 0,
+                    }
+                g["chunk_count"] += 1
+                ia = payload.get("ingested_at")
+                if ia and (not g["ingested_at"] or ia > g["ingested_at"]):
+                    g["ingested_at"] = ia
+            if offset is None:
+                break
+
+        docs = list(groups.values())
+        docs.sort(key=lambda d: (d.get("ingested_at") or "", d["document_name"]), reverse=True)
+        return docs

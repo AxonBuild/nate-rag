@@ -1,5 +1,7 @@
 from backend.app.schemas.ingest import (
+    DeleteDocumentResponse,
     DocumentIngestResponse,
+    DocumentListItem,
     ProcessedTranscriptResponse,
     QaColumnsPreviewResponse,
     QaIngestResponse,
@@ -155,3 +157,11 @@ class IngestController:
             doc_type=result.get("doc_type"),
             preview=result.get("preview", []),
         )
+
+    async def list_documents(self) -> list[DocumentListItem]:
+        docs = await self._document.list_documents()
+        return [DocumentListItem(**d) for d in docs]
+
+    async def delete_document(self, document_id: str) -> DeleteDocumentResponse:
+        deleted = await self._document.delete_document(document_id)
+        return DeleteDocumentResponse(document_id=document_id, deleted_chunks=deleted)

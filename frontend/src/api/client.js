@@ -97,4 +97,7 @@ export const api = {
   previewQaColumns: (formData) => upload('/ingest/qa/preview', formData),
   ingestQa: (formData) => upload('/ingest/qa', formData),
   ingestDocument: (formData) => upload('/ingest/document', formData),
+  listDocuments: () => request('/ingest/documents'),
+  deleteDocument: (id) =>
+    request(`/ingest/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

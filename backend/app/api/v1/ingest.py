@@ -10,7 +10,9 @@ from backend.app.dependencies.container import (
 )
 from backend.app.infrastructure.clerk.auth import require_user
 from backend.app.schemas.ingest import (
+    DeleteDocumentResponse,
     DocumentIngestResponse,
+    DocumentListItem,
     QaColumnsPreviewResponse,
     QaIngestResponse,
     TranscriptIngestResponse,
@@ -223,3 +225,22 @@ async def ingest_document(
             status_code=500,
             detail="Document ingest failed. Check server logs for details.",
         ) from e
+
+
+@router.get("/documents", response_model=list[DocumentListItem])
+async def list_documents(
+    _user: dict[str, str] = Depends(require_user),
+    controller: IngestController = Depends(get_ingest_controller),
+):
+    """List ingested knowledge-base documents (grouped by document, with chunk counts)."""
+    return await controller.list_documents()
+
+
+@router.delete("/documents/{document_id}", response_model=DeleteDocumentResponse)
+async def delete_document(
+    document_id: str,
+    _user: dict[str, str] = Depends(require_user),
+    controller: IngestController = Depends(get_ingest_controller),
+):
+    """Delete every chunk for a document by its document_id."""
+    return await controller.delete_document(document_id)

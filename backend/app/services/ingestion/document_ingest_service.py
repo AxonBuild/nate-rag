@@ -132,3 +132,9 @@ class DocumentIngestService:
             "doc_type": doc_type,
             "preview": level_2_preview,
         }
+
+    async def list_documents(self) -> list[dict[str, Any]]:
+        return await self._qdrant.list_documents()
+
+    async def delete_document(self, document_id: str) -> int:
+        return await self._qdrant.delete_document(document_id)
