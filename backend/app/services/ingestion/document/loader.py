@@ -3,7 +3,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-
+import fitz
 from backend.app.services.ingestion.document.models import Document
 
 
@@ -17,37 +17,26 @@ async def load_document(file_bytes: bytes, filename: str) -> Document:
 
 
 async def _load_pdf(pdf_bytes: bytes, filename: str) -> Document:
-    import pdfplumber
+    # PyMuPDF (fitz) extracts text in a small fraction of pdfplumber's memory — pdfplumber's
+    # extract_text() peaks at ~1 GB on a 300-page file (OOM on a 1 GB box), fitz at ~70 MB.
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(pdf_bytes)
-        tmp_path = tmp.name
+    page_texts: list[str] = []
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as pdf:
+        total_pages = pdf.page_count
+        for page in pdf:
+            text = page.get_text()
+            if text:
+                page_texts.append(text)
 
-    try:
-        page_texts: list[str] = []
-        with pdfplumber.open(tmp_path) as pdf:
-            total_pages = len(pdf.pages)
-            for page in pdf.pages:
-                text = page.extract_text(layout=True, x_tolerance=2, y_tolerance=2)
-                if text:
-                    page_texts.append(text)
-                # Drop pdfplumber's per-page parse cache. It otherwise retains every page's
-                # chars/layout objects for the life of the open document, ballooning RAM on
-                # large PDFs. We never re-read the page, so flushing here is safe.
-                page.flush_cache()
-
-        combined = _normalize("\n\n".join(page_texts))
-        return Document(
-            text=combined,
-            metadata={
-                "source": filename,
-                "document_name": filename,
-                "total_pages": total_pages,
-            },
-        )
-    finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+    combined = _normalize("\n\n".join(page_texts))
+    return Document(
+        text=combined,
+        metadata={
+            "source": filename,
+            "document_name": filename,
+            "total_pages": total_pages,
+        },
+    )
 
 
 async def _load_docx(docx_bytes: bytes, filename: str) -> Document:
